@@ -1984,15 +1984,45 @@ describe('AdminScreen', () => {
 - [ ] **Step 3: Тест MoreTab** — кнопки экспорта присутствуют; у участника нет кнопки «Админ»; импорт с битым файлом показывает ошибку.
 
 ```tsx
-it('битый файл при импорте → сообщение об ошибке', async () => {
-  const file = new File(['{bad'], 'x.json', { type: 'application/json' });
-  // ... заглушка: through input.files via userEvent.upload
+// src/components/MoreTab.test.tsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { MoreTab } from './MoreTab';
+import { createTestTrack, resetDb } from '../db/test-helpers';
+
+describe('MoreTab', () => {
+  beforeEach(resetDb);
+
+  it('показывает кнопки экспорта/импорта/журнала', async () => {
+    await createTestTrack(); // дом обязателен для экспорта
+    render(<MoreTab onChanged={() => {}} isAdmin />);
+    expect(screen.getByRole('button', { name: /экспорт бэкапа/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /экспорт pdf/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /экспорт шаблона/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /импорт шаблона/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /журнал/i })).toBeTruthy();
+  });
+
+  it('у участника нет кнопки «Админ»', async () => {
+    render(<MoreTab onChanged={() => {}} isAdmin={false} />);
+    expect(screen.queryByRole('button', { name: /админ/i })).toBeNull();
+  });
+
+  it('битый файл при импорте → сообщение об ошибке', async () => {
+    await createTestTrack();
+    render(<MoreTab onChanged={() => {}} isAdmin />);
+    const file = new File(['{bad'], 'x.json', { type: 'application/json' });
+    // input[type=file] обязан иметь aria-label «Импорт бэкапа (JSON)» (см. Step 4)
+    await userEvent.upload(screen.getByLabelText(/импорт бэкапа/i), file);
+    expect(await screen.findByText(/не удалось|ошибк/i)).toBeTruthy();
+  });
 });
 ```
 
 - [ ] **Step 4: Реализовать `MoreTab.tsx`, `ImportPreviewModal.tsx`, `JournalScreen.tsx`**
 
-MoreTab: экспорт бэкапа — `buildHouseholdEnvelope` → `new Blob([JSON.stringify(env, null, 2)], {type:'application/json'})` → download (URL.createObjectURL + a[download]) или Web Share API если есть (`navigator.canShare({files})`). Импорт: `<input type="file" accept="application/json">` → `file.text()` → `parseHouseholdEnvelope` → если ок, `importHouseholdEnvelope` → показать `ImportPreviewModal` с summary → «Подтвердить» (повторный вызов) — внимание: сделать двухфазно: сначала parse+preview (подсчёт выполняется на данных, но применение после подтверждения). Реализация двухфазности: `parseHouseholdEnvelope` и `buildImportPreview(env)` (те же вычисления, без записи) → на «Подтвердить» — `importHouseholdEnvelope`. Экспорт PDF: список живых треков → `buildTrackPdf` → download. Шаблон: выбор трека → `buildTrackTemplate` → download; импорт шаблона: `importTrackTemplate` через parse.
+MoreTab: экспорт бэкапа — `buildHouseholdEnvelope` → `new Blob([JSON.stringify(env, null, 2)], {type:'application/json'})` → download (URL.createObjectURL + a[download]) или Web Share API если есть (`navigator.canShare({files})`). Импорт: `<input type="file" accept="application/json" aria-label="Импорт бэкапа (JSON)">` (aria-label обязателен — на него ссылается тест `getByLabelText`) → `file.text()` → `parseHouseholdEnvelope` → если ок, `importHouseholdEnvelope` → показать `ImportPreviewModal` с summary → «Подтвердить» (повторный вызов) — внимание: сделать двухфазно: сначала parse+preview (подсчёт выполняется на данных, но применение после подтверждения). Реализация двухфазности: `parseHouseholdEnvelope` и `buildImportPreview(env)` (те же вычисления, без записи) → на «Подтвердить» — `importHouseholdEnvelope`. Экспорт PDF: список живых треков → `buildTrackPdf` → download. Шаблон: выбор трека → `buildTrackTemplate` → download; импорт шаблона: `importTrackTemplate` через parse.
 Журнал: `db.ops` по убыванию `when`, фильтр по треку (select), формат строки: дата, deviceLabel, тип (рус.), позиция, delta, note.
 
 - [ ] **Step 5: Проверить** — `npx vitest run src/components/AdminScreen.test.tsx src/components/MoreTab.test.tsx` → PASS; `npm run build` → OK.
