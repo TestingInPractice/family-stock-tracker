@@ -50,6 +50,7 @@ export async function createTestTrack(): Promise<[Track, Category, Item, Item]> 
     id: genId('trk'), name: 'Аптечка', emoji: '💊', sortOrder: 0, createdAt: Date.now(),
     updatedAt: Date.now(), updatedBy: 'test', deletedAt: null,
   };
+  await db.tracks.put(track); // фикстура должна персистить трек (Task 7: экспорт читает db.tracks)
   const cat = await createTestCategory(track.id, 'Аптечка дома');
   cat.emoji = '🏠'; // фикстура не создаёт отдельный трек-test-хелпер для эмодзи
   await db.categories.put(cat);
