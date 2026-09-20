@@ -9,7 +9,7 @@ import {
   parseHouseholdEnvelope,
   parseTrackTemplate,
 } from '../logic/import';
-import type { HouseholdEnvelope, ImportSummary } from '../types';
+import type { HouseholdEnvelope, ImportSummary, Track } from '../types';
 import { ImportPreviewModal } from './ImportPreviewModal';
 import { JournalScreen } from './JournalScreen';
 import { AdminScreen } from './AdminScreen';
@@ -48,6 +48,8 @@ export function MoreTab({ onChanged, isAdmin }: MoreTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportSummary | null>(null);
   const [pendingEnvelope, setPendingEnvelope] = useState<HouseholdEnvelope | null>(null);
+  const [templateTracks, setTemplateTracks] = useState<Track[] | null>(null);
+  const [templateTrackId, setTemplateTrackId] = useState('');
   const backupInputRef = useRef<HTMLInputElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,12 +106,21 @@ export function MoreTab({ onChanged, isAdmin }: MoreTabProps) {
     }
   };
 
-  const exportTemplate = async () => {
+  const openTemplatePicker = async () => {
     const tracks = await listTracks();
     if (tracks.length === 0) return;
-    const tpl = await buildTrackTemplate(tracks[0].id);
+    setTemplateTracks(tracks);
+    setTemplateTrackId(tracks[0].id);
+  };
+
+  const downloadTemplate = async () => {
+    if (!templateTracks) return;
+    const track = templateTracks.find(t => t.id === templateTrackId);
+    if (!track) return;
+    const tpl = await buildTrackTemplate(track.id);
     const blob = new Blob([JSON.stringify(tpl, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, `${tracks[0].name}-template.json`);
+    await shareOrDownload(blob, `${track.name}-template.json`);
+    setTemplateTracks(null);
   };
 
   if (view === 'journal') return <JournalScreen onBack={() => setView('main')} />;
@@ -122,7 +133,7 @@ export function MoreTab({ onChanged, isAdmin }: MoreTabProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 260 }}>
         <button type="button" onClick={() => void exportBackup()}>Экспорт бэкапа дома (JSON)</button>
         <button type="button" onClick={() => void exportPdf()}>Экспорт PDF</button>
-        <button type="button" onClick={() => void exportTemplate()}>Экспорт шаблона трека</button>
+        <button type="button" onClick={() => void openTemplatePicker()}>Экспорт шаблона трека</button>
         <button type="button" onClick={() => backupInputRef.current?.click()}>Импорт бэкапа</button>
         <button type="button" onClick={() => templateInputRef.current?.click()}>Импорт шаблона трека</button>
         <button type="button" onClick={() => setView('journal')}>Журнал</button>
@@ -152,6 +163,22 @@ export function MoreTab({ onChanged, isAdmin }: MoreTabProps) {
           e.target.value = '';
         }}
       />
+      {templateTracks ? (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 260 }}>
+          <div style={{ fontSize: 14 }}>Трек для шаблона</div>
+          <select
+            aria-label="Выберите трек для шаблона"
+            value={templateTrackId}
+            onChange={e => setTemplateTrackId(e.target.value)}
+          >
+            {templateTracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={() => void downloadTemplate()}>Скачать шаблон</button>
+            <button type="button" onClick={() => setTemplateTracks(null)}>Отмена</button>
+          </div>
+        </div>
+      ) : null}
       {preview && pendingEnvelope ? (
         <ImportPreviewModal
           summary={preview}
