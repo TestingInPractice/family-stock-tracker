@@ -159,7 +159,7 @@ export async function restockItem(id: string, amount: number, note: string): Pro
 }
 
 /** Рекордер операций: id = `${deviceId}:${seq}`, seq инкрементится в meta. */
-async function recordOp(input: {
+export async function recordOp(input: {
   type: OpType; itemId: string | null; trackId: string | null; delta: number | null; note: string;
 }): Promise<void> {
   const device = await deviceId();
