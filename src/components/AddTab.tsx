@@ -1,85 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
-import { db, listCategories, listTracks, recordOp, saveItem } from '../db/db';
+import type { KeyboardEvent } from 'react';
+import { addItem, db, listCategories, listTracks } from '../db/db';
 import { UNITS } from '../constants';
 import { genId } from '../logic/ids';
+import {
+  actionStyle, chipStyle, emptyRow, fieldStyle, modeFromMethod,
+  pluralizePositions, quantityOrOne, rowStyle, toIsoDate,
+} from '../logic/add-form';
+import type { Row } from '../logic/add-form';
 import type { Category, TrackingMethod, Track } from '../types';
 
 interface AddTabProps {
   onChanged: () => void;
-}
-
-interface Row {
-  name: string;
-  quantity: string;
-  unit: string;
-  expiresAt: string | null;
-  categoryId: string;
-  trackExpiry: boolean;
-  trackQuantity: boolean;
-}
-
-interface Mode {
-  trackExpiry: boolean;
-  trackQuantity: boolean;
-}
-
-const DEFAULT_MODE: Mode = { trackExpiry: true, trackQuantity: true };
-
-const fieldStyle: CSSProperties = {
-  padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 15,
-};
-const rowStyle: CSSProperties = {
-  display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center',
-};
-const chipStyle: CSSProperties = {
-  padding: '6px 10px', borderRadius: 8, border: '1px solid #cbd5e1',
-  background: '#fff', fontSize: 14, cursor: 'pointer',
-};
-const actionStyle: CSSProperties = {
-  padding: '10px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-  fontWeight: 600, fontSize: 15, background: '#16a34a', color: '#fff',
-};
-
-function modeFromMethod(cat: Category | undefined, methods: Map<string, TrackingMethod>): Mode {
-  if (!cat || cat.trackingMethodId === null) return DEFAULT_MODE;
-  const method = methods.get(cat.trackingMethodId);
-  if (!method) return DEFAULT_MODE;
-  return { trackExpiry: method.flags.expiry, trackQuantity: method.flags.quantity };
-}
-
-function emptyRow(categoryId: string, mode: Mode): Row {
-  return {
-    name: '', quantity: '1', unit: 'шт', expiresAt: null, categoryId,
-    trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
-  };
-}
-
-function pluralizePositions(n: number): string {
-  const abs = Math.abs(n) % 100;
-  const last = abs % 10;
-  if (abs > 10 && abs < 20) return 'позиций';
-  if (last > 1 && last < 5) return 'позиции';
-  if (last === 1) return 'позицию';
-  return 'позиций';
-}
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function addMonths(months: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + months);
-  return toIsoDate(d);
-}
-
-function quantityOrOne(raw: string): number {
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 export function AddTab({ onChanged }: AddTabProps) {
@@ -89,12 +21,12 @@ export function AddTab({ onChanged }: AddTabProps) {
   const [trackId, setTrackId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [allNames, setAllNames] = useState<string[]>([]);
-  const [rows, setRows] = useState<Row[]>(() => [emptyRow('', DEFAULT_MODE)]);
+  const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
   const [loaded, setLoaded] = useState(false);
   const nameRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [pendingFocus, setPendingFocus] = useState<number | null>(null);
 
-  const currentMode = modeFromMethod(categories.find(c => c.id === categoryId), methods);
+  const currentMode = modeFromMethod(methods.get(categories.find(c => c.id === categoryId)?.trackingMethodId ?? ''));
   const nonEmptyCount = rows.filter(r => r.name.trim() !== '').length;
 
   useEffect(() => {
@@ -118,7 +50,7 @@ export function AddTab({ onChanged }: AddTabProps) {
       const lastId = lastRow ? String(lastRow.value) : null;
       const defaultCatId = lastId && cats.some(c => c.id === lastId) ? lastId : (cats[0]?.id ?? '');
       setCategoryId(defaultCatId);
-      const mode = modeFromMethod(cats.find(c => c.id === defaultCatId), methodMap);
+      const mode = modeFromMethod(methodMap.get(cats.find(c => c.id === defaultCatId)?.trackingMethodId ?? ''));
       setRows(prev => prev.map(r => ({
         ...r, categoryId: defaultCatId, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
       })));
@@ -172,7 +104,7 @@ export function AddTab({ onChanged }: AddTabProps) {
     setCategories(cats);
     const defaultCatId = cats[0]?.id ?? '';
     setCategoryId(defaultCatId);
-    const mode = modeFromMethod(cats.find(c => c.id === defaultCatId), methods);
+    const mode = modeFromMethod(methods.get(cats.find(c => c.id === defaultCatId)?.trackingMethodId ?? ''));
     setRows(prev => prev.map(r => ({
       ...r, categoryId: defaultCatId, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
     })));
@@ -180,7 +112,7 @@ export function AddTab({ onChanged }: AddTabProps) {
 
   const handleCategoryChange = (id: string) => {
     setCategoryId(id);
-    const mode = modeFromMethod(categories.find(c => c.id === id), methods);
+    const mode = modeFromMethod(methods.get(categories.find(c => c.id === id)?.trackingMethodId ?? ''));
     setRows(prev => prev.map(r => ({
       ...r, categoryId: id, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
     })));
@@ -190,14 +122,13 @@ export function AddTab({ onChanged }: AddTabProps) {
     const nonEmpty = rows.filter(r => r.name.trim() !== '');
     if (nonEmpty.length === 0) return;
     // onChanged до await: fake-indexeddb использует setImmediate-макрозадачи,
-    // не завершающиеся за userEvent.click (см. SpendModal). Все транзакции
-    // ставятся в очередь синхронно, чтобы к моменту db.close() в afterEach
-    // не оставалось незавершённых записей (иначе DatabaseClosedError).
+    // не завершающиеся за userEvent.click (см. SpendModal). addItem — одна
+    // транзакция, ставится в очередь синхронно, поэтому к db.close() в
+    // afterEach незавершённых записей не остаётся.
     const pending = (async () => {
       for (const row of nonEmpty) {
-        const itemId = genId('itm');
-        const p1 = saveItem({
-          id: itemId,
+        await addItem({
+          id: genId('itm'),
           categoryId: row.categoryId,
           name: row.name.trim(),
           unit: row.unit || 'шт',
@@ -213,10 +144,7 @@ export function AddTab({ onChanged }: AddTabProps) {
           updatedAt: 0,
           updatedBy: '',
           deletedAt: null,
-        });
-        const p2 = recordOp({ type: 'add', itemId, trackId, delta: null, note: '' });
-        await p1;
-        await p2;
+        }, trackId);
       }
     })();
     const metaPut = db.meta.put({ key: 'lastCategoryId', value: categoryId });
@@ -280,8 +208,8 @@ export function AddTab({ onChanged }: AddTabProps) {
           <select aria-label="Единица" value={row.unit} style={fieldStyle} onChange={e => updateRow(i, { unit: e.target.value })}>
             {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
-          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: addMonths(1) })}>+1 мес</button>
-          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: addMonths(12) })}>+1 год</button>
+          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: toIsoDate(1) })}>+1 мес</button>
+          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: toIsoDate(12) })}>+1 год</button>
           <input
             type="date"
             aria-label="Своя дата"

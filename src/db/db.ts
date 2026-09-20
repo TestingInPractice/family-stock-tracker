@@ -117,6 +117,14 @@ export async function saveItem(item: Item): Promise<void> {
   await db.items.put({ ...item, ...syncMeta(await deviceId()) });
 }
 
+/** Добавление позиции: item + add-op в одной транзакции (атомарно). */
+export async function addItem(item: Item, trackId: string | null, note = ''): Promise<void> {
+  await db.transaction('rw', db.items, db.ops, db.meta, db.household, db.categories, async () => {
+    await db.items.put({ ...item, ...syncMeta(await deviceId()) });
+    await recordOp({ type: 'add', itemId: item.id, trackId, delta: null, note });
+  });
+}
+
 export async function softDeleteItem(id: string): Promise<void> {
   const item = await db.items.get(id);
   if (!item) return;
@@ -159,7 +167,7 @@ export async function restockItem(id: string, amount: number, note: string): Pro
 }
 
 /** Рекордер операций: id = `${deviceId}:${seq}`, seq инкрементится в meta. */
-export async function recordOp(input: {
+async function recordOp(input: {
   type: OpType; itemId: string | null; trackId: string | null; delta: number | null; note: string;
 }): Promise<void> {
   const device = await deviceId();
