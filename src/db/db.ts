@@ -2,8 +2,14 @@ import Dexie, { type Table } from 'dexie';
 import type {
   Category, DeviceProfile, Household, Item, LocalState, Op, OpType, TrackingMethod, Track,
 } from '../types';
-import { DEFAULT_TRACKING_METHODS } from '../constants';
+import { DEFAULT_TRACKING_METHODS, DEFAULT_UNITS } from '../constants';
 import { genId, syncMeta } from '../logic/ids';
+import { migrateV2 } from './migrate-v2';
+
+/** Временные v2-row-формы таблиц каталога (в Task 3 заменяются на Place/Type/Unit из types.ts). */
+export interface PlaceRow { id: string; trackId: string; name: string; emoji: string; sortOrder: number; updatedAt?: number; updatedBy?: string; deletedAt?: number | null }
+export interface TypeRow { id: string; name: string; emoji: string; trackingMethodId: string; sortOrder: number; updatedAt?: number; updatedBy?: string; deletedAt?: number | null }
+export interface UnitRow { id: string; name: string; sortOrder: number; updatedAt?: number; updatedBy?: string; deletedAt?: number | null }
 
 class TrackerDb extends Dexie {
   household!: Table<Household, string>;
@@ -11,6 +17,9 @@ class TrackerDb extends Dexie {
   trackingMethods!: Table<TrackingMethod, string>;
   tracks!: Table<Track, string>;
   categories!: Table<Category, string>;
+  places!: Table<PlaceRow, string>;
+  types!: Table<TypeRow, string>;
+  units!: Table<UnitRow, string>;
   items!: Table<Item, string>;
   ops!: Table<Op, string>;
   meta!: Table<{ key: string; value: unknown }, string>;
@@ -27,6 +36,19 @@ class TrackerDb extends Dexie {
       ops: 'id, itemId, when',
       meta: 'key',
     });
+    this.version(2).stores({
+      household: 'id, createdAt',
+      deviceProfile: 'id',
+      trackingMethods: 'id',
+      tracks: 'id',
+      categories: 'id, trackId',        // остаётся на время Task 2 (старый код жив)
+      places: 'id, trackId',
+      types: 'id',
+      units: 'id',
+      items: 'id, categoryId, placeId', // двойной индекс переходного периода
+      ops: 'id, itemId, when',
+      meta: 'key',
+    }).upgrade(migrateV2);
   }
 }
 
@@ -40,10 +62,14 @@ async function deviceId(): Promise<string> {
   return id;
 }
 
-/** Первый запуск: засеять дефолтные способы отслеживания (идемпотентно по id). */
+/** Первый запуск: засеять дефолтные способы отслеживания и единицы (идемпотентно по фикс. id). */
 export async function ensureOnboarding(): Promise<void> {
+  const now = Date.now();
   await db.trackingMethods.bulkPut(
-    DEFAULT_TRACKING_METHODS.map(m => ({ ...m, updatedAt: Date.now(), updatedBy: 'seed' })),
+    DEFAULT_TRACKING_METHODS.map(m => ({ ...m, updatedAt: now, updatedBy: 'seed' })),
+  );
+  await db.units.bulkPut(
+    DEFAULT_UNITS.map(u => ({ ...u, updatedAt: now, updatedBy: 'seed' })),
   );
 }
 
