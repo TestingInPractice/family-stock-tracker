@@ -1,6 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Onboarding } from './components/Onboarding';
-import { ensureOnboarding, getDeviceProfile, getHousehold } from './db/db';
+import { DashboardTab } from './components/DashboardTab';
+import { TracksTab } from './components/TracksTab';
+import { TrackScreen } from './components/TrackScreen';
+import { AddTab } from './components/AddTab';
+import { MoreTab } from './components/MoreTab';
+import { db, ensureOnboarding, getDeviceProfile, getHousehold } from './db/db';
+import { problemCount, useBadge } from './hooks/useBadge';
 import type { DeviceProfile, Household, Tab } from './types';
 
 const TABS: { id: Tab; label: string }[] = [
@@ -11,30 +17,30 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'more', label: 'Ещё' },
 ];
 
-// Заглушки экранов: Tasks 11-14 заменят их реальными компонентами
-// (DashboardTab, TracksTab, TrackScreen и т.д.), которые получат onChanged.
-const PLACEHOLDERS: Record<Tab, string> = {
-  dashboard: 'Дашборд появится в следующей задаче',
-  tracks: 'Треки появятся в следующей задаче',
-  add: 'Добавление появится в следующей задаче',
-  spend: 'Списание появится в следующей задаче',
-  more: 'Ещё появится в следующей задаче',
-};
-
 interface AppState {
   ready: boolean;
   household: Household | null;
   profile: DeviceProfile | null;
+  problemCount: number;
 }
 
 export function App() {
-  const [state, setState] = useState<AppState>({ ready: false, household: null, profile: null });
+  const [state, setState] = useState<AppState>({
+    ready: false, household: null, profile: null, problemCount: 0,
+  });
   const [active, setActive] = useState<Tab>('dashboard');
+  const [openTrackId, setOpenTrackId] = useState<string | null>(null);
+
+  useBadge(state.problemCount);
 
   const reload = async () => {
     await ensureOnboarding();
     const [household, profile] = await Promise.all([getHousehold(), getDeviceProfile()]);
-    setState({ ready: true, household: household ?? null, profile: profile ?? null });
+    // Бейдж на иконке приложения: число проблемных позиций (просрочено/истекает/низкий/избыток).
+    const count = household
+      ? problemCount(await db.items.toArray(), household.warnDays, new Date())
+      : 0;
+    setState({ ready: true, household: household ?? null, profile: profile ?? null, problemCount: count });
   };
 
   useEffect(() => {
@@ -47,9 +53,47 @@ export function App() {
     return <Onboarding onDone={reload} />;
   }
 
+  const household = state.household; // сужено до Household: онбординг-гейт выше
+
+  // Клик по позиции на дашборде → открываем трек этой позиции (Task 11).
+  const openItemTrack = async (itemId: string) => {
+    const item = await db.items.get(itemId);
+    if (!item) return;
+    const cat = await db.categories.get(item.categoryId);
+    setActive('tracks');
+    if (cat) setOpenTrackId(cat.trackId);
+  };
+
+  const renderTab = (tab: Tab): ReactNode => {
+    switch (tab) {
+      case 'dashboard':
+        return <DashboardTab household={household} onChanged={reload} onOpenItem={openItemTrack} />;
+      case 'tracks':
+        return <TracksTab onOpenTrack={id => setOpenTrackId(id)} />;
+      case 'add':
+        return <AddTab onChanged={reload} />;
+      // Отдельного экрана «Списать» нет: списание живёт в TrackScreen/SpendModal.
+      // Решение оркестратора Task 15 — вкладка «Списать» показывает список треков.
+      case 'spend':
+        return <TracksTab onOpenTrack={id => setOpenTrackId(id)} />;
+      case 'more':
+        return <MoreTab onChanged={reload} isAdmin={state.profile?.role === 'admin'} />;
+    }
+  };
+
   return (
     <div className="app-shell">
-      <main>{renderTab(active)}</main>
+      <main>
+        {openTrackId !== null ? (
+          <TrackScreen
+            trackId={openTrackId}
+            onBack={() => setOpenTrackId(null)}
+            onChanged={reload}
+          />
+        ) : (
+          renderTab(active)
+        )}
+      </main>
       <nav className="tab-bar">
         {TABS.map(tab => (
           <button
@@ -64,10 +108,4 @@ export function App() {
       </nav>
     </div>
   );
-}
-
-function renderTab(tab: Tab): ReactNode {
-  // Вкладка «Ещё» (Task 14): вход в админку виден только для role='admin',
-  // для role='member' пункт «Админ» скрыт.
-  return <div>{PLACEHOLDERS[tab]}</div>;
 }
