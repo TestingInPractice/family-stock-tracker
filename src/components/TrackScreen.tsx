@@ -49,7 +49,9 @@ export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const quickSpend = async (id: string) => {
-    await spendItem(id, 1, '');
+    const op = spendItem(id, 1, '');
+    onChanged(); // App пересчитывает бейдж; readonly-refetch сериализуется за rw-транзакцией
+    await op;
     await load();
   };
 
@@ -129,7 +131,7 @@ export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
         <SpendModal
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
-          onChanged={() => { void load(); }}
+          onChanged={() => { onChanged(); void load(); }}
         />
       ) : null}
     </section>
