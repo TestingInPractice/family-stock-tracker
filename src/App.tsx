@@ -100,7 +100,10 @@ export function App() {
             key={tab.id}
             type="button"
             aria-current={active === tab.id ? 'page' : undefined}
-            onClick={() => setActive(tab.id)}
+            onClick={() => {
+              setActive(tab.id);
+              setOpenTrackId(null);
+            }}
           >
             {tab.label}
           </button>
