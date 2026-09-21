@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    image: family-stock-tracker:latest
+    container_name: family-stock-tracker
+    ports:
+      - "5173:80"
+    restart: unless-stopped

@@ -1,0 +1,58 @@
+{
+  "format": "household-backup",
+  "version": 1,
+  "exportedAt": 1780000000000,
+  "deviceId": "dev_demo",
+  "deviceLabel": "Телефон Пети",
+  "household": {
+    "id": "hh_demo01",
+    "name": "Демо-семья",
+    "warnDays": 30,
+    "deviceLabel": "Телефон Пети",
+    "createdAt": 1779999900000,
+    "updatedAt": 1779999900000,
+    "updatedBy": "demo",
+    "deletedAt": null
+  },
+  "trackingMethods": [
+    { "id": "tm_expiry", "name": "Срок годности", "flags": { "expiry": true, "quantity": false }, "sortOrder": 0, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "tm_qty_min", "name": "Остаток ниже минимума", "flags": { "expiry": false, "quantity": true }, "sortOrder": 1, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "tm_both", "name": "Срок + остаток (min/max)", "flags": { "expiry": true, "quantity": true }, "sortOrder": 2, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null }
+  ],
+  "tracks": [
+    { "id": "tr_demo01", "name": "Аптечка", "emoji": "💊", "sortOrder": 0, "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null }
+  ],
+  "categories": [
+    { "id": "cat_dem01", "trackId": "tr_demo01", "name": "Обезболивающие", "emoji": "💊", "trackingMethodId": "tm_expiry", "sortOrder": 0, "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "cat_dem02", "trackId": "tr_demo01", "name": "Жаропонижающие", "emoji": "🌡️", "trackingMethodId": "tm_expiry", "sortOrder": 1, "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "cat_dem03", "trackId": "tr_demo01", "name": "Противопростудные", "emoji": "🤧", "trackingMethodId": "tm_expiry", "sortOrder": 2, "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "cat_dem04", "trackId": "tr_demo01", "name": "Желудочные", "emoji": "🍽️", "trackingMethodId": "tm_both", "sortOrder": 3, "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "cat_dem05", "trackId": "tr_demo01", "name": "Сердечно-сосудистые", "emoji": "❤️", "trackingMethodId": "tm_expiry", "sortOrder": 4, "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null }
+  ],
+  "items": [
+    { "id": "it_demo01", "categoryId": "cat_dem01", "name": "Ибупрофен 400 мг", "unit": "упак", "quantity": 2, "minThreshold": 1, "maxThreshold": 5, "expiresAt": "2026-10-03", "packSize": 20, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo02", "categoryId": "cat_dem01", "name": "Парацетамол 500 мг", "unit": "упак", "quantity": 1, "minThreshold": 1, "maxThreshold": 5, "expiresAt": "2026-08-10", "packSize": 10, "trackExpiry": true, "trackQuantity": true, "notes": "просрочен!", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo03", "categoryId": "cat_dem01", "name": "Анальгин", "unit": "упак", "quantity": 3, "minThreshold": 1, "maxThreshold": 5, "expiresAt": "2027-03-15", "packSize": 10, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo04", "categoryId": "cat_dem02", "name": "Нурофен детский", "unit": "уп", "quantity": 1, "minThreshold": 1, "maxThreshold": 3, "expiresAt": "2026-09-25", "packSize": 12, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo05", "categoryId": "cat_dem02", "name": "Цефекон Д", "unit": "упак", "quantity": 2, "minThreshold": 1, "maxThreshold": 3, "expiresAt": "2028-01-20", "packSize": 10, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo06", "categoryId": "cat_dem03", "name": "Колдрекс", "unit": "упак", "quantity": 1, "minThreshold": 2, "maxThreshold": 4, "expiresAt": "2026-10-15", "packSize": 10, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo07", "categoryId": "cat_dem03", "name": "Витамин C", "unit": "банка", "quantity": 10, "minThreshold": 1, "maxThreshold": 5, "expiresAt": "2026-10-02", "packSize": 30, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo08", "categoryId": "cat_dem04", "name": "Смекта", "unit": "упак", "quantity": 2, "minThreshold": 3, "maxThreshold": 6, "expiresAt": "2027-02-10", "packSize": 10, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo09", "categoryId": "cat_dem04", "name": "Активированный уголь", "unit": "упак", "quantity": 20, "minThreshold": 1, "maxThreshold": null, "expiresAt": null, "packSize": 10, "trackExpiry": false, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo10", "categoryId": "cat_dem05", "name": "Нитроглицерин", "unit": "упак", "quantity": 1, "minThreshold": 1, "maxThreshold": 5, "expiresAt": "2026-09-19", "packSize": 25, "trackExpiry": true, "trackQuantity": true, "notes": "просрочен!", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null },
+    { "id": "it_demo11", "categoryId": "cat_dem05", "name": "Валидол", "unit": "упак", "quantity": 4, "minThreshold": 1, "maxThreshold": 5, "expiresAt": "2026-10-18", "packSize": 10, "trackExpiry": true, "trackQuantity": true, "notes": "", "createdAt": 1779999900000, "updatedAt": 1779999900000, "updatedBy": "demo", "deletedAt": null }
+  ],
+  "ops": [
+    { "id": "dev_demo:1", "deviceId": "dev_demo", "deviceSeq": 1, "type": "add", "itemId": "it_demo01", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:2", "deviceId": "dev_demo", "deviceSeq": 2, "type": "add", "itemId": "it_demo02", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:3", "deviceId": "dev_demo", "deviceSeq": 3, "type": "add", "itemId": "it_demo03", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:4", "deviceId": "dev_demo", "deviceSeq": 4, "type": "add", "itemId": "it_demo04", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:5", "deviceId": "dev_demo", "deviceSeq": 5, "type": "add", "itemId": "it_demo05", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:6", "deviceId": "dev_demo", "deviceSeq": 6, "type": "add", "itemId": "it_demo06", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:7", "deviceId": "dev_demo", "deviceSeq": 7, "type": "add", "itemId": "it_demo07", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:8", "deviceId": "dev_demo", "deviceSeq": 8, "type": "add", "itemId": "it_demo08", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:9", "deviceId": "dev_demo", "deviceSeq": 9, "type": "add", "itemId": "it_demo09", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:10", "deviceId": "dev_demo", "deviceSeq": 10, "type": "add", "itemId": "it_demo10", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" },
+    { "id": "dev_demo:11", "deviceId": "dev_demo", "deviceSeq": 11, "type": "add", "itemId": "it_demo11", "trackId": "tr_demo01", "delta": null, "deviceLabel": "Телефон Пети", "when": 1779999900000, "note": "" }
+  ]
+}
