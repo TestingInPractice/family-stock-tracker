@@ -59,9 +59,9 @@ export function App() {
   const openItemTrack = async (itemId: string) => {
     const item = await db.items.get(itemId);
     if (!item) return;
-    const cat = await db.categories.get(item.categoryId);
+    const place = await db.places.get(item.placeId);
     setActive('tracks');
-    if (cat) setOpenTrackId(cat.trackId);
+    if (place) setOpenTrackId(place.trackId);
   };
 
   const renderTab = (tab: Tab): ReactNode => {

@@ -1,18 +1,6 @@
-import type { Item, ItemStatus, TrackingMethod } from './types';
+import type { Item, ItemStatus, TrackingMethod, Unit } from './types';
 
-export const UNITS = ['шт', 'таб', 'пак', 'кг', 'г', 'банка', 'мл', 'л'] as const;
-
-/** Временная v2-форма единицы (в types.ts Unit появится в Task 3). */
-interface Unit {
-  id: string;
-  name: string;
-  sortOrder: number;
-  updatedAt: number;
-  updatedBy: string;
-  deletedAt: number | null;
-}
-
-/** Единицы каталога: фикс. id, чтобы bulkPut при онбординге был идемпотентен. */
+// Единицы каталога: фикс. id, чтобы bulkPut при онбординге был идемпотентен.
 export const DEFAULT_UNITS: Unit[] = [
   { id: 'unit_sht', name: 'шт', sortOrder: 0, updatedAt: 0, updatedBy: 'seed', deletedAt: null },
   { id: 'unit_tab', name: 'таб', sortOrder: 1, updatedAt: 0, updatedBy: 'seed', deletedAt: null },
@@ -38,8 +26,19 @@ export const STATUS_META: Record<ItemStatus, { label: string; emoji: string; pri
   ok:        { label: 'В норме',        emoji: '⚪', priority: 0 },
 };
 
-export const EMPTY_ITEM = (categoryId: string): Item => ({
-  id: '', categoryId, name: '', unit: 'шт', quantity: 0, minThreshold: null,
+export const EMPTY_ITEM = (placeId: string, typeId: string): Item => ({
+  id: '', placeId, typeId, name: '', unit: 'шт', quantity: 0, minThreshold: null,
   maxThreshold: null, expiresAt: null, packSize: null, trackExpiry: false,
   trackQuantity: false, notes: '', createdAt: 0, updatedAt: 0, updatedBy: '', deletedAt: null,
 });
+
+export const UI_TEXTS = {
+  addPlace: 'Добавить место',
+  placeNamePrompt: 'Название места (например, аптечка дома)',
+  placeEmojiPrompt: 'Эмодзи места (по умолчанию 📦)',
+  minPlaceholder: 'купить при ≤ N',
+  maxPlaceholder: 'избыток при ≥ N',
+  typeSection: 'Типы позиций',
+  unitSection: 'Единицы',
+  emptyAddForm: 'Сначала создайте трек и место в нём, а тип позиции — в админке',
+} as const;

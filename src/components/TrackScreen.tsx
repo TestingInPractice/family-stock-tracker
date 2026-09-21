@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db, getHousehold, spendItem } from '../db/db';
-import { STATUS_META, UNITS } from '../constants';
+import { listPlaces, listUnits } from '../db/catalog';
+import { STATUS_META } from '../constants';
 import { computeStatus, sortByUrgency } from '../logic/status';
 import { SpendModal } from './SpendModal';
-import type { Category, Household, Item, Track } from '../types';
+import type { Household, Item, Place, Track, Unit } from '../types';
 
 interface TrackScreenProps {
   trackId: string;
@@ -20,20 +21,23 @@ const rowStyle: React.CSSProperties = {
 export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
   const [household, setHousehold] = useState<Household | undefined>();
   const [track, setTrack] = useState<Track | undefined>();
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
 
   const load = useCallback(async () => {
-    const [hh, trk, cats, its] = await Promise.all([
+    const [hh, trk, plcs, unts, its] = await Promise.all([
       getHousehold(),
       db.tracks.get(trackId),
-      db.categories.toArray(),
+      listPlaces(trackId),
+      listUnits(),
       db.items.toArray(),
     ]);
     setHousehold(hh);
     setTrack(trk);
-    setCategories(cats.filter(c => c.deletedAt === null));
+    setPlaces(plcs);
+    setUnits(unts);
     setItems(its.filter(i => i.deletedAt === null));
   }, [trackId]);
 
@@ -44,9 +48,10 @@ export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
   const warnDays = household?.warnDays ?? 28;
   const today = new Date();
 
-  const trackCats = categories
-    .filter(c => c.trackId === trackId)
+  const trackPlaces = places
+    .filter(p => p.trackId === trackId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+  const unitNames = new Set(units.map(u => u.name));
 
   const quickSpend = async (id: string) => {
     const op = spendItem(id, 1, '');
@@ -62,27 +67,27 @@ export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
         <span style={{ fontSize: 28 }}>{track?.emoji ?? '📦'}</span>
         <h1 style={{ margin: 0, fontSize: 22 }}>{track?.name ?? 'Трек'}</h1>
       </header>
-      {trackCats.length === 0 ? (
-        <p>В этом треке пока нет категорий.</p>
+      {trackPlaces.length === 0 ? (
+        <p>В этом треке пока нет мест.</p>
       ) : (
-        trackCats.map(cat => {
-          const catItems = sortByUrgency(
-            items.filter(i => i.categoryId === cat.id),
+        trackPlaces.map(place => {
+          const placeItems = sortByUrgency(
+            items.filter(i => i.placeId === place.id),
             warnDays,
             today,
           );
           return (
-            <section key={cat.id} style={{ marginBottom: 16 }}>
+            <section key={place.id} style={{ marginBottom: 16 }}>
               <h2 style={{ fontSize: 17, margin: '0 0 8px' }}>
-                {cat.emoji} {cat.name}
+                {place.emoji} {place.name}
               </h2>
-              {catItems.length === 0 ? (
+              {placeItems.length === 0 ? (
                 <p style={{ color: '#64748b' }}>Пусто</p>
               ) : (
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {catItems.map(item => {
+                  {placeItems.map(item => {
                     const status = computeStatus(item, warnDays, today);
-                    const unit = (UNITS as readonly string[]).includes(item.unit)
+                    const unit = unitNames.has(item.unit)
                       ? item.unit
                       : 'шт';
                     return (

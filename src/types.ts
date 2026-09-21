@@ -33,16 +33,33 @@ export interface Track extends SyncFields {
   createdAt: number;
 }
 
-export interface Category extends SyncFields {
+// v2: место (бывшая категория, способ уезжает в тип)
+export interface Place extends SyncFields {
   trackId: string;
   name: string;
   emoji: string;
-  trackingMethodId: string | null;
+  sortOrder: number;
+}
+
+// v1-совместимая форма категории — ТОЛЬКО для чтения старых бэкапов
+export type CategoryV1 = Place & { trackingMethodId: string | null };
+export type ItemV1 = Omit<Item, 'placeId' | 'typeId'> & { categoryId: string };
+
+export interface Type extends SyncFields {
+  name: string;
+  emoji: string;
+  trackingMethodId: string; // способ отслеживания (срок/остаток)
+  sortOrder: number;
+}
+
+export interface Unit extends SyncFields {
+  name: string;
   sortOrder: number;
 }
 
 export interface Item extends SyncFields {
-  categoryId: string;
+  placeId: string;       // было categoryId
+  typeId: string;        // новое
   name: string;
   unit: string;
   quantity: number;
@@ -74,7 +91,7 @@ export interface Op {
 export type ItemStatus = 'expired' | 'expiring' | 'low' | 'excess' | 'ok';
 
 // Позиция шаблона трека (экспорт/импорт вне семейства):
-// categoryId хранит ИМЯ категории, а не id (категорий в целевой базе ещё нет).
+// placeName хранит ИМЯ места, typeName — ИМЯ типа (в целевой базе их ещё нет).
 export interface TemplateItem {
   name: string;
   unit: string;
@@ -86,10 +103,11 @@ export interface TemplateItem {
   trackExpiry: boolean;
   trackQuantity: boolean;
   notes: string;
-  categoryId: string;
+  placeName: string;  // было categoryId (имя места в целевом треке)
+  typeName: string;   // новое: имя типа (ищется в каталоге дома)
 }
 
-export interface HouseholdEnvelope {
+export interface HouseholdEnvelopeV1 {
   format: 'household-backup';
   version: 1;
   exportedAt: number;
@@ -98,18 +116,36 @@ export interface HouseholdEnvelope {
   household: Household;
   trackingMethods: TrackingMethod[];
   tracks: Track[];
-  categories: Category[];
+  categories: CategoryV1[];
+  items: ItemV1[];
+  ops: Op[];
+}
+
+export interface HouseholdEnvelopeV2 {
+  format: 'household-backup';
+  version: 2;
+  exportedAt: number;
+  deviceId: string;
+  deviceLabel: string;
+  household: Household;
+  trackingMethods: TrackingMethod[];
+  tracks: Track[];
+  types: Type[];
+  units: Unit[];
+  places: Place[];
   items: Item[];
   ops: Op[];
 }
 
+export type HouseholdEnvelope = HouseholdEnvelopeV1 | HouseholdEnvelopeV2;
+
 export interface TrackTemplateEnvelope {
   format: 'track-template';
-  version: 1;
+  version: 2;                       // было 1
   trackName: string;
   trackEmoji: string;
-  categories: { name: string; emoji: string }[];
-  items: TemplateItem[]; // categoryId = имя категории; без журнала и sync-полей
+  places: { name: string; emoji: string }[];   // было categories
+  items: TemplateItem[];            // placeName/typeName вместо categoryId
 }
 
 export interface ImportSummary {
@@ -119,14 +155,14 @@ export interface ImportSummary {
   deleted: number;
 }
 
-// Полный локальный срез (используется db.ts и merge.ts; определяем здесь,
-// чтобы db.ts (Task 3) мог работать с ним до появления merge.ts — Task 4).
 export interface LocalState {
   household: Household | null;
   deviceProfile: DeviceProfile | null;
   trackingMethods: TrackingMethod[];
   tracks: Track[];
-  categories: Category[];
+  types: Type[];
+  units: Unit[];
+  places: Place[];
   items: Item[];
   ops: Op[];
 }
@@ -137,7 +173,9 @@ export interface MergedState {
   household: Household | null;
   trackingMethods: TrackingMethod[];
   tracks: Track[];
-  categories: Category[];
+  types: Type[];
+  units: Unit[];
+  places: Place[];
   items: Item[];
   ops: Op[];
 }

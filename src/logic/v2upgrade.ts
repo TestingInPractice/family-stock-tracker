@@ -1,9 +1,9 @@
 import { genId } from './ids';
-import type { Category, TrackingMethod } from '../types';
+import type { CategoryV1, Place, TrackingMethod, Type } from '../types';
 
 export interface V2UpgradeResult {
-  places: Array<{ id: string; trackId: string; name: string; emoji: string; sortOrder: number }>;
-  types: Array<{ id: string; name: string; emoji: string; trackingMethodId: string; sortOrder: number }>;
+  places: Place[];
+  types: Type[];
   typeIdByCategoryId: Map<string, string>;
   seedExpiryMethod: TrackingMethod | null;
 }
@@ -17,7 +17,7 @@ const SEED_METHOD_ID = 'tm_expiry';
  * Чистая функция: без I/O, `now` передаётся для тестируемости.
  */
 export function planV2(
-  legacyCategories: Category[],
+  legacyCategories: CategoryV1[],
   trackingMethods: TrackingMethod[],
   now: number,
 ): V2UpgradeResult {
@@ -38,11 +38,19 @@ export function planV2(
           deletedAt: null,
         };
 
-  const resolveMethodId = (c: Category): string =>
+  const resolveMethodId = (c: CategoryV1): string =>
     liveMethodId(c.trackingMethodId) ?? seedExpiryMethod?.id ?? SEED_METHOD_ID;
 
+  // Места наследуют sync-поля исходной категории (updatedAt/updatedBy/deletedAt).
   const places: V2UpgradeResult['places'] = legacyCategories.map(c => ({
-    id: c.id, trackId: c.trackId, name: c.name, emoji: c.emoji, sortOrder: c.sortOrder,
+    id: c.id,
+    trackId: c.trackId,
+    name: c.name,
+    emoji: c.emoji,
+    sortOrder: c.sortOrder,
+    updatedAt: c.updatedAt,
+    updatedBy: c.updatedBy,
+    deletedAt: c.deletedAt,
   }));
 
   const typeByIdName = new Map<string, string>();
@@ -59,6 +67,9 @@ export function planV2(
         emoji: c.emoji,
         trackingMethodId: resolveMethodId(c),
         sortOrder: types.length,
+        updatedAt: now,
+        updatedBy: 'seed',
+        deletedAt: null,
       });
     }
     typeIdByCategoryId.set(c.id, typeId);

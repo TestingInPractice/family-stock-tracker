@@ -1,4 +1,6 @@
-import type { HouseholdEnvelope, ImportSummary, LocalState, MergedState, Op, SyncFields } from '../types';
+import type {
+  HouseholdEnvelopeV2, ImportSummary, LocalState, MergedState, Op, SyncFields,
+} from '../types';
 
 function recordKey<T extends SyncFields>(r: T): string { return r.id; }
 function sameFields<T>(a: T, b: T): boolean { return JSON.stringify(a) === JSON.stringify(b); }
@@ -42,14 +44,16 @@ export function mergeOps(local: Op[], incoming: Op[]): Op[] {
   return [...byId.values()].sort((a, b) => a.deviceSeq - b.deviceSeq);
 }
 
-/** Полное слияние envelope с локальным срезом (LocalState): результат — MergedState для upsertMany. */
+/** Полное слияние envelope v2 с локальным срезом (LocalState): результат — MergedState для upsertMany. */
 export function mergeEnvelope(
-  env: HouseholdEnvelope,
+  env: HouseholdEnvelopeV2,
   local: LocalState,
 ): { records: MergedState; summary: ImportSummary } {
   const trackingMethods = mergeLists(local.trackingMethods, env.trackingMethods, env.exportedAt);
   const tracks = mergeLists(local.tracks, env.tracks, env.exportedAt);
-  const categories = mergeLists(local.categories, env.categories, env.exportedAt);
+  const types = mergeLists(local.types, env.types, env.exportedAt);
+  const units = mergeLists(local.units, env.units, env.exportedAt);
+  const places = mergeLists(local.places, env.places, env.exportedAt);
   const items = mergeLists(local.items, env.items, env.exportedAt);
   const household = mergeLists(
     local.household ? [local.household] : [],
@@ -69,13 +73,15 @@ export function mergeEnvelope(
       household: household.records[0] ?? env.household,
       trackingMethods: trackingMethods.records,
       tracks: tracks.records,
-      categories: categories.records,
+      types: types.records,
+      units: units.records,
+      places: places.records,
       items: items.records,
       ops: mergeOps(local.ops, env.ops),
     },
     summary: sum(
       trackingMethods.summary, tracks.summary,
-      categories.summary, items.summary, household.summary,
+      types.summary, units.summary, places.summary, items.summary, household.summary,
     ),
   };
 }

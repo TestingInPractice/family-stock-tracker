@@ -11,7 +11,8 @@ export interface Row {
   quantity: string;
   unit: string;
   expiresAt: string | null;
-  categoryId: string;
+  placeId: string;
+  typeId: string;
   trackExpiry: boolean;
   trackQuantity: boolean;
 }
@@ -38,9 +39,9 @@ export function modeFromMethod(method: TrackingMethod | undefined): Mode {
   return { trackExpiry: method.flags.expiry, trackQuantity: method.flags.quantity };
 }
 
-export function emptyRow(categoryId = '', mode: Mode = DEFAULT_MODE): Row {
+export function emptyRow(placeId = '', typeId = '', mode: Mode = DEFAULT_MODE): Row {
   return {
-    name: '', quantity: '1', unit: 'шт', expiresAt: null, categoryId,
+    name: '', quantity: '1', unit: 'шт', expiresAt: null, placeId, typeId,
     trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
   };
 }

@@ -4,7 +4,7 @@ import { computeStatus, sortByUrgency } from './status';
 import type { Item } from '../types';
 
 const make = (over: Partial<Item>): Item => ({
-  id: 'i', categoryId: 'c', name: 'n', unit: 'шт', quantity: 1, minThreshold: null,
+  id: 'i', placeId: 'p', typeId: 't', name: 'n', unit: 'шт', quantity: 1, minThreshold: null,
   maxThreshold: null, expiresAt: null, packSize: null, trackExpiry: false,
   trackQuantity: false, notes: '', createdAt: 0, updatedAt: 0, updatedBy: 'd', deletedAt: null, ...over,
 });

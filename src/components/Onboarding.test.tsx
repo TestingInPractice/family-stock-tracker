@@ -7,7 +7,7 @@ import { Onboarding } from './Onboarding';
 
 const demoEnvelope: HouseholdEnvelope = {
   format: 'household-backup',
-  version: 1,
+  version: 2,
   exportedAt: Date.now(),
   deviceId: 'dev_demo',
   deviceLabel: 'Телефон Пети',
@@ -17,7 +17,9 @@ const demoEnvelope: HouseholdEnvelope = {
   },
   trackingMethods: [],
   tracks: [],
-  categories: [],
+  types: [],
+  units: [],
+  places: [],
   items: [],
   ops: [],
 };

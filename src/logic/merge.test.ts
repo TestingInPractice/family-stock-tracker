@@ -3,7 +3,7 @@ import { mergeLists, mergeOps } from './merge';
 import type { Item, Op } from '../types';
 
 const base = (id: string, updatedAt: number, deletedAt: number | null = null): Item =>
-  ({ id, categoryId: 'c1', name: 'n', unit: 'шт', quantity: 1, minThreshold: null,
+  ({ id, placeId: 'p1', typeId: 't1', name: 'n', unit: 'шт', quantity: 1, minThreshold: null,
      maxThreshold: null, expiresAt: null, packSize: null, trackExpiry: false,
      trackQuantity: false, notes: '', createdAt: 1, updatedAt, updatedBy: 'dev', deletedAt });
 

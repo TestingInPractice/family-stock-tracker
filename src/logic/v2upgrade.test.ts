@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { planV2, type V2UpgradeResult } from './v2upgrade';
-import type { Category, TrackingMethod } from '../types';
+import type { CategoryV1, TrackingMethod } from '../types';
 
-const CATEGORY = (over: Partial<Category>): Category => ({
+const CATEGORY = (over: Partial<CategoryV1>): CategoryV1 => ({
   id: 'cat_1', trackId: 'trk_1', name: 'Аптечка', emoji: '🏠', trackingMethodId: 'tm_expiry', sortOrder: 0,
   updatedAt: 1, updatedBy: 'd', deletedAt: null, ...over,
 });
@@ -14,7 +14,10 @@ const METHOD = (over: Partial<TrackingMethod>): TrackingMethod => ({
 describe('planV2', () => {
   it('место = категория без trackingMethodId, id сохраняется', () => {
     const r: V2UpgradeResult = planV2([CATEGORY({})], [METHOD({})], 10);
-    expect(r.places).toEqual([{ id: 'cat_1', trackId: 'trk_1', name: 'Аптечка', emoji: '🏠', sortOrder: 0 }]);
+    expect(r.places).toEqual([{
+      id: 'cat_1', trackId: 'trk_1', name: 'Аптечка', emoji: '🏠', sortOrder: 0,
+      updatedAt: 1, updatedBy: 'd', deletedAt: null,
+    }]);
   });
 
   it('тип наследует способ; тип создаётся один на имя; typeIdByCategoryId покрывает все категории', () => {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../db/db';
 import { STATUS_META } from '../constants';
 import { computeStatus, isProblem, sortByUrgency } from '../logic/status';
-import type { Category, Household, Item, ItemStatus } from '../types';
+import type { Household, Item, ItemStatus, Place } from '../types';
 
 const PROBLEM_STATUSES: ItemStatus[] = ['expired', 'expiring', 'low', 'excess'];
 const URGENT_LIMIT = 15;
@@ -16,18 +16,18 @@ interface DashboardTabProps {
 export function DashboardTab({ household, onChanged, onOpenItem }: DashboardTabProps) {
   void onChanged; // контракт интерфейса: App может подписаться на изменения в Task 12
   const [items, setItems] = useState<Item[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [allItems, allCats] = await Promise.all([
+      const [allItems, allPlaces] = await Promise.all([
         db.items.toArray(),
-        db.categories.toArray(),
+        db.places.toArray(),
       ]);
       if (cancelled) return;
       setItems(allItems.filter(i => i.deletedAt === null));
-      setCategories(allCats.filter(c => c.deletedAt === null));
+      setPlaces(allPlaces.filter(p => p.deletedAt === null));
     })();
     return () => { cancelled = true; };
   }, [household]);
@@ -42,7 +42,7 @@ export function DashboardTab({ household, onChanged, onOpenItem }: DashboardTabP
     .filter(i => isProblem(computeStatus(i, warnDays, today)))
     .slice(0, URGENT_LIMIT);
 
-  const catById = new Map(categories.map(c => [c.id, c]));
+  const placeById = new Map(places.map(p => [p.id, p]));
   const openItem = onOpenItem ?? (() => {});
 
   return (
@@ -63,13 +63,13 @@ export function DashboardTab({ household, onChanged, onOpenItem }: DashboardTabP
       ) : (
         <ul className="urgent-list">
           {urgent.map(item => {
-            const cat = catById.get(item.categoryId);
+            const place = placeById.get(item.placeId);
             return (
               <li key={item.id}>
                 <button type="button" onClick={() => openItem(item.id)}>
-                  <span>{cat?.emoji ?? '📦'}</span>
+                  <span>{place?.emoji ?? '📦'}</span>
                   <span>{item.name}</span>
-                  <span>{cat?.name ?? ''}</span>
+                  <span>{place?.name ?? ''}</span>
                 </button>
               </li>
             );

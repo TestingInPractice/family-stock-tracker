@@ -16,12 +16,12 @@ export async function buildTrackPdf(trackId: string): Promise<Blob> {
   const warnDays = hd[0]?.warnDays ?? 30;
   const deviceLabel = hd[0]?.deviceLabel ?? '';
   const today = new Date();
-  const cats = (await db.categories.where('trackId').equals(trackId).toArray()).filter(c => c.deletedAt === null);
-  const items = (await db.items.toArray()).filter(i => cats.some(c => c.id === i.categoryId) && i.deletedAt === null);
+  const places = (await db.places.where('trackId').equals(trackId).toArray()).filter(p => p.deletedAt === null);
+  const items = (await db.items.toArray()).filter(i => places.some(p => p.id === i.placeId) && i.deletedAt === null);
   const rows = sortByUrgency(items, warnDays, today).map(i => {
-    const cat = cats.find(c => c.id === i.categoryId);
+    const place = places.find(p => p.id === i.placeId);
     return [
-      cat?.name ?? '', i.name, `${i.quantity} ${i.unit}`,
+      place?.name ?? '', i.name, `${i.quantity} ${i.unit}`,
       i.expiresAt ?? '—', STATUS_META[computeStatus(i, warnDays, today)].label,
     ];
   });
@@ -37,7 +37,7 @@ export async function buildTrackPdf(trackId: string): Promise<Blob> {
   doc.text(`Выгружено: ${today.toLocaleDateString('ru-RU')} · ${deviceLabel}`, 14, 26);
   autoTable(doc, {
     startY: 32,
-    head: [['Категория', 'Позиция', 'Кол-во', 'Срок', 'Статус']],
+    head: [['Место', 'Позиция', 'Кол-во', 'Срок', 'Статус']],
     body: rows,
     styles: { font: 'PTSans', fontSize: 9 },
     headStyles: { font: 'PTSans', fontStyle: 'bold', fillColor: [14, 116, 144] },

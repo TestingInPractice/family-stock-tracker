@@ -13,16 +13,21 @@ describe('import', () => {
   });
 
   it('round-trip: экспорт → очистка → импорт = без потерь, ops без дубликатов', async () => {
-    await createTestTrack(); // трек + категория + 2 позиции, 2 списания (ops)
+    await createTestTrack(); // трек + место/тип + 2 позиции, 2 списания (ops)
     const env = await buildHouseholdEnvelope();
     const opsBefore = await db.ops.count();
 
-    await db.transaction('rw', db.tracks, db.categories, db.items, db.ops, async () => {
-      await Promise.all([db.tracks.clear(), db.categories.clear(), db.items.clear(), db.ops.clear()]);
+    await db.transaction('rw', db.tracks, db.places, db.types, db.units, db.items, db.ops, async () => {
+      await Promise.all([
+        db.tracks.clear(), db.places.clear(), db.types.clear(), db.units.clear(),
+        db.items.clear(), db.ops.clear(),
+      ]);
     });
     const summary = await importHouseholdEnvelope(env);
     expect(summary.added).toBeGreaterThan(0);
     expect(await db.tracks.count()).toBe(1);
+    expect(await db.places.count()).toBe(1);
+    expect(await db.types.count()).toBe(1);
     expect(await db.items.count()).toBe(2);
     expect(await db.ops.count()).toBe(opsBefore);
 

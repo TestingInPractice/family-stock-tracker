@@ -51,7 +51,7 @@ describe('db', () => {
     expect(ops[2].delta).toBe(-3);
   });
 
-  it('миграция v1→v2: категория → место + тип, item получает placeId/typeId, единицы засеяны', async () => {
+  it('миграция v1→v3: категория → место + тип, item получает placeId/typeId, единицы засеяны', async () => {
     await db.delete(); // удалить v2-базу, созданную resetDb (открыть поверх версию 1 нельзя)
     await seedLegacyV1(); // создать чистую v1-базу с данными
     await db.open(); // запускает upgrade v1→v2
@@ -70,9 +70,9 @@ describe('db', () => {
 
   it('catalog: listPlaces фильтрует могилки и сортирует по sortOrder', async () => {
     await db.places.bulkPut([
-      { id: 'plc_1', trackId: 'trk_1', name: 'З', emoji: '🏠', sortOrder: 2 },
-      { id: 'plc_2', trackId: 'trk_1', name: 'А', emoji: '🍳', sortOrder: 0, deletedAt: 5 },
-      { id: 'plc_3', trackId: 'trk_1', name: 'Б', emoji: '📦', sortOrder: 1 },
+      { id: 'plc_1', trackId: 'trk_1', name: 'З', emoji: '🏠', sortOrder: 2, updatedAt: 1, updatedBy: 'd', deletedAt: null },
+      { id: 'plc_2', trackId: 'trk_1', name: 'А', emoji: '🍳', sortOrder: 0, updatedAt: 1, updatedBy: 'd', deletedAt: 5 },
+      { id: 'plc_3', trackId: 'trk_1', name: 'Б', emoji: '📦', sortOrder: 1, updatedAt: 1, updatedBy: 'd', deletedAt: null },
     ]);
     const places = await listPlaces('trk_1');
     expect(places.map(p => p.id)).toEqual(['plc_3', 'plc_1']);

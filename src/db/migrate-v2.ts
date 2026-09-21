@@ -1,37 +1,38 @@
 import type { Transaction } from 'dexie';
-import type { Category, Item, TrackingMethod } from '../types';
+import type { CategoryV1, Item, ItemV1, TrackingMethod } from '../types';
 import { DEFAULT_UNITS } from '../constants';
 import { planV2 } from '../logic/v2upgrade';
-
-/** Временное пересечение: на v1 у items нет v2-полей (появляются в Task 3). */
-type V1Item = Item & { placeId?: string; typeId?: string; categoryId: string };
 
 /** v1→v2: категории → места+типы (planV2), items получают placeId/typeId, сид единиц. */
 export async function migrateV2(tx: Transaction): Promise<void> {
   const now = Date.now();
-  const categories = await tx.table<Category, string>('categories').toArray();
+  const categories = await tx.table<CategoryV1, string>('categories').toArray();
   const methods = await tx.table<TrackingMethod, string>('trackingMethods').toArray();
   const result = planV2(categories, methods, now);
-  const categoryById = new Map(categories.map(c => [c.id, c]));
-  await tx.table('places').bulkPut(
-    result.places.map(p => {
-      const src = categoryById.get(p.id);
-      return src ? { ...p, updatedAt: src.updatedAt, updatedBy: src.updatedBy, deletedAt: src.deletedAt } : p;
-    }),
-  );
-  await tx.table('types').bulkPut(
-    result.types.map(t => ({ ...t, updatedAt: now, updatedBy: 'seed', deletedAt: null })),
-  );
+  await tx.table('places').bulkPut(result.places);
+  await tx.table('types').bulkPut(result.types);
   if (result.seedExpiryMethod) await tx.table('trackingMethods').put(result.seedExpiryMethod);
   if ((await tx.table('units').count()) === 0) {
     await tx.table('units').bulkPut(DEFAULT_UNITS.map(u => ({ ...u, updatedAt: now, updatedBy: 'seed' })));
   }
-  const items = await tx.table<V1Item, string>('items').toArray();
+  const items = await tx.table<ItemV1, string>('items').toArray();
   await tx.table('items').bulkPut(
     items.map(i => ({
       ...i,
-      placeId: i.placeId ?? i.categoryId,
-      typeId: i.typeId ?? result.typeIdByCategoryId.get(i.categoryId) ?? result.types[0]?.id ?? '',
+      placeId: i.categoryId,
+      typeId: result.typeIdByCategoryId.get(i.categoryId) ?? result.types[0]?.id ?? '',
+    })),
+  );
+}
+
+/** v2→v3: таблица categories дропнута схемой; из items уходит categoryId, место/тип гарантированы. */
+export async function migrateV3(tx: Transaction): Promise<void> {
+  const items = await tx.table<Item, string>('items').toArray();
+  await tx.table('items').bulkPut(
+    items.map(({ categoryId: _drop, ...rest }) => ({
+      ...rest,
+      placeId: rest.placeId ?? '',
+      typeId: rest.typeId ?? '',
     })),
   );
 }

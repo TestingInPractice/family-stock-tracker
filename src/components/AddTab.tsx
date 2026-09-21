@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { addItem, db, listCategories, listTracks } from '../db/db';
-import { UNITS } from '../constants';
+import { addItem, db, listTracks } from '../db/db';
+import { listPlaces, listTypes, listUnits } from '../db/catalog';
 import { genId } from '../logic/ids';
 import {
   actionStyle, chipStyle, emptyRow, fieldStyle, modeFromMethod,
   pluralizePositions, quantityOrOne, rowStyle, toIsoDate,
+  type Mode, type Row,
 } from '../logic/add-form';
-import type { Row } from '../logic/add-form';
-import type { Category, TrackingMethod, Track } from '../types';
+import type { Place, TrackingMethod, Track, Type, Unit } from '../types';
 
 interface AddTabProps {
   onChanged: () => void;
@@ -16,24 +16,27 @@ interface AddTabProps {
 
 export function AddTab({ onChanged }: AddTabProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [types, setTypes] = useState<Type[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [methods, setMethods] = useState<Map<string, TrackingMethod>>(new Map());
   const [trackId, setTrackId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [placeId, setPlaceId] = useState('');
+  const [typeId, setTypeId] = useState('');
   const [allNames, setAllNames] = useState<string[]>([]);
   const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
   const [loaded, setLoaded] = useState(false);
   const nameRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [pendingFocus, setPendingFocus] = useState<number | null>(null);
 
-  const currentMode = modeFromMethod(methods.get(categories.find(c => c.id === categoryId)?.trackingMethodId ?? ''));
+  const currentMode = modeFromMethod(methods.get(types.find(t => t.id === typeId)?.trackingMethodId ?? ''));
   const nonEmptyCount = rows.filter(r => r.name.trim() !== '').length;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [trackRows, items, methodRows] = await Promise.all([
-        listTracks(), db.items.toArray(), db.trackingMethods.toArray(),
+      const [trackRows, items, methodRows, typeRows, unitRows] = await Promise.all([
+        listTracks(), db.items.toArray(), db.trackingMethods.toArray(), listTypes(), listUnits(),
       ]);
       if (cancelled) return;
       const methodMap = new Map(methodRows.map(m => [m.id, m]));
@@ -41,18 +44,30 @@ export function AddTab({ onChanged }: AddTabProps) {
       setAllNames([...new Set(items.filter(i => i.deletedAt === null).map(i => i.name))]);
       if (trackRows.length === 0) { setTracks([]); setLoaded(true); return; }
       setTracks(trackRows);
+      setTypes(typeRows);
+      setUnits(unitRows);
       const firstTrackId = trackRows[0].id;
-      const cats = await listCategories(firstTrackId);
+      const plcs = await listPlaces(firstTrackId);
       if (cancelled) return;
-      setCategories(cats);
+      setPlaces(plcs);
       setTrackId(firstTrackId);
-      const lastRow = await db.meta.get('lastCategoryId');
-      const lastId = lastRow ? String(lastRow.value) : null;
-      const defaultCatId = lastId && cats.some(c => c.id === lastId) ? lastId : (cats[0]?.id ?? '');
-      setCategoryId(defaultCatId);
-      const mode = modeFromMethod(methodMap.get(cats.find(c => c.id === defaultCatId)?.trackingMethodId ?? ''));
+      const [lastPlace, lastType] = await Promise.all([
+        db.meta.get('lastPlaceId'), db.meta.get('lastTypeId'),
+      ]);
+      const lastPlaceId = lastPlace ? String(lastPlace.value) : null;
+      const defaultPlaceId = lastPlaceId && plcs.some(p => p.id === lastPlaceId)
+        ? lastPlaceId
+        : (plcs[0]?.id ?? '');
+      const lastTypeId = lastType ? String(lastType.value) : null;
+      const defaultTypeId = lastTypeId && typeRows.some(t => t.id === lastTypeId)
+        ? lastTypeId
+        : (typeRows[0]?.id ?? '');
+      setPlaceId(defaultPlaceId);
+      setTypeId(defaultTypeId);
+      const mode = modeFromMethod(methodMap.get(typeRows.find(t => t.id === defaultTypeId)?.trackingMethodId ?? ''));
       setRows(prev => prev.map(r => ({
-        ...r, categoryId: defaultCatId, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
+        ...r, placeId: defaultPlaceId, typeId: defaultTypeId,
+        trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
       })));
       setLoaded(true);
     })();
@@ -69,7 +84,7 @@ export function AddTab({ onChanged }: AddTabProps) {
     setRows(prev => {
       const next = prev.map((r, idx) => idx === i ? { ...r, name: value } : r);
       if (next.every(r => r.name.trim() === '') && next.length > 1) {
-        return [emptyRow(categoryId, currentMode)];
+        return [emptyRow(placeId, typeId, currentMode)];
       }
       return next;
     });
@@ -80,7 +95,7 @@ export function AddTab({ onChanged }: AddTabProps) {
   };
 
   const addRow = () => {
-    setRows(prev => [...prev, emptyRow(categoryId, currentMode)]);
+    setRows(prev => [...prev, emptyRow(placeId, typeId, currentMode)]);
   };
 
   const handleNameFocus = (i: number) => {
@@ -100,21 +115,23 @@ export function AddTab({ onChanged }: AddTabProps) {
 
   const handleTrackChange = async (id: string) => {
     setTrackId(id);
-    const cats = await listCategories(id);
-    setCategories(cats);
-    const defaultCatId = cats[0]?.id ?? '';
-    setCategoryId(defaultCatId);
-    const mode = modeFromMethod(methods.get(cats.find(c => c.id === defaultCatId)?.trackingMethodId ?? ''));
-    setRows(prev => prev.map(r => ({
-      ...r, categoryId: defaultCatId, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
-    })));
+    const plcs = await listPlaces(id);
+    setPlaces(plcs);
+    const defaultPlaceId = plcs[0]?.id ?? '';
+    setPlaceId(defaultPlaceId);
+    setRows(prev => prev.map(r => ({ ...r, placeId: defaultPlaceId })));
   };
 
-  const handleCategoryChange = (id: string) => {
-    setCategoryId(id);
-    const mode = modeFromMethod(methods.get(categories.find(c => c.id === id)?.trackingMethodId ?? ''));
+  const handlePlaceChange = (id: string) => {
+    setPlaceId(id);
+    setRows(prev => prev.map(r => ({ ...r, placeId: id })));
+  };
+
+  const handleTypeChange = (id: string) => {
+    setTypeId(id);
+    const mode = modeFromMethod(methods.get(types.find(t => t.id === id)?.trackingMethodId ?? ''));
     setRows(prev => prev.map(r => ({
-      ...r, categoryId: id, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
+      ...r, typeId: id, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
     })));
   };
 
@@ -129,7 +146,8 @@ export function AddTab({ onChanged }: AddTabProps) {
       for (const row of nonEmpty) {
         await addItem({
           id: genId('itm'),
-          categoryId: row.categoryId,
+          placeId: row.placeId,
+          typeId: row.typeId,
           name: row.name.trim(),
           unit: row.unit || 'шт',
           quantity: quantityOrOne(row.quantity),
@@ -147,18 +165,19 @@ export function AddTab({ onChanged }: AddTabProps) {
         }, trackId);
       }
     })();
-    const metaPut = db.meta.put({ key: 'lastCategoryId', value: categoryId });
+    const metaPut = db.meta.put({ key: 'lastPlaceId', value: placeId });
+    const metaPutType = db.meta.put({ key: 'lastTypeId', value: typeId });
     onChanged();
     await pending;
-    await metaPut;
-    setRows([emptyRow(categoryId, currentMode)]);
+    await Promise.all([metaPut, metaPutType]);
+    setRows([emptyRow(placeId, typeId, currentMode)]);
   };
 
-  if (loaded && (tracks.length === 0 || categories.length === 0)) {
+  if (loaded && (tracks.length === 0 || places.length === 0 || types.length === 0)) {
     return (
       <section>
         <h1>Добавление</h1>
-        <p>Сначала создайте трек во вкладке «Треки»</p>
+        <p>Сначала создайте трек и место в нём, а тип позиции — в админке</p>
       </section>
     );
   }
@@ -174,9 +193,15 @@ export function AddTab({ onChanged }: AddTabProps) {
           </select>
         </label>
         <label style={{ fontSize: 14 }}>
-          Категория
-          <select value={categoryId} onChange={e => handleCategoryChange(e.target.value)} style={fieldStyle}>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+          Место
+          <select value={placeId} onChange={e => handlePlaceChange(e.target.value)} style={fieldStyle}>
+            {places.map(p => <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>)}
+          </select>
+        </label>
+        <label style={{ fontSize: 14 }}>
+          Тип
+          <select value={typeId} onChange={e => handleTypeChange(e.target.value)} style={fieldStyle}>
+            {types.map(t => <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>)}
           </select>
         </label>
       </div>
@@ -206,7 +231,7 @@ export function AddTab({ onChanged }: AddTabProps) {
             onChange={e => updateRow(i, { quantity: e.target.value })}
           />
           <select aria-label="Единица" value={row.unit} style={fieldStyle} onChange={e => updateRow(i, { unit: e.target.value })}>
-            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+            {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
           </select>
           <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: toIsoDate(1) })}>+1 мес</button>
           <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: toIsoDate(12) })}>+1 год</button>

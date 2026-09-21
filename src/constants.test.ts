@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TRACKING_METHODS, UNITS } from './constants';
+import { DEFAULT_TRACKING_METHODS, DEFAULT_UNITS } from './constants';
 
 describe('DEFAULT_TRACKING_METHODS', () => {
   it('id уникальны', () => {
@@ -8,9 +8,10 @@ describe('DEFAULT_TRACKING_METHODS', () => {
   });
 });
 
-describe('UNITS', () => {
+describe('DEFAULT_UNITS', () => {
   it('содержит шт и кг', () => {
-    expect(UNITS).toContain('шт');
-    expect(UNITS).toContain('кг');
+    const names = DEFAULT_UNITS.map(u => u.name);
+    expect(names).toContain('шт');
+    expect(names).toContain('кг');
   });
 });

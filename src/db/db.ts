@@ -1,25 +1,19 @@
 import Dexie, { type Table } from 'dexie';
 import type {
-  Category, DeviceProfile, Household, Item, LocalState, Op, OpType, TrackingMethod, Track,
+  DeviceProfile, Household, Item, LocalState, Op, OpType, Place, TrackingMethod, Track, Type, Unit,
 } from '../types';
 import { DEFAULT_TRACKING_METHODS, DEFAULT_UNITS } from '../constants';
 import { genId, syncMeta } from '../logic/ids';
-import { migrateV2 } from './migrate-v2';
-
-/** Временные v2-row-формы таблиц каталога (в Task 3 заменяются на Place/Type/Unit из types.ts). */
-export interface PlaceRow { id: string; trackId: string; name: string; emoji: string; sortOrder: number; updatedAt?: number; updatedBy?: string; deletedAt?: number | null }
-export interface TypeRow { id: string; name: string; emoji: string; trackingMethodId: string; sortOrder: number; updatedAt?: number; updatedBy?: string; deletedAt?: number | null }
-export interface UnitRow { id: string; name: string; sortOrder: number; updatedAt?: number; updatedBy?: string; deletedAt?: number | null }
+import { migrateV2, migrateV3 } from './migrate-v2';
 
 class TrackerDb extends Dexie {
   household!: Table<Household, string>;
   deviceProfile!: Table<DeviceProfile, string>;
   trackingMethods!: Table<TrackingMethod, string>;
   tracks!: Table<Track, string>;
-  categories!: Table<Category, string>;
-  places!: Table<PlaceRow, string>;
-  types!: Table<TypeRow, string>;
-  units!: Table<UnitRow, string>;
+  places!: Table<Place, string>;
+  types!: Table<Type, string>;
+  units!: Table<Unit, string>;
   items!: Table<Item, string>;
   ops!: Table<Op, string>;
   meta!: Table<{ key: string; value: unknown }, string>;
@@ -41,14 +35,26 @@ class TrackerDb extends Dexie {
       deviceProfile: 'id',
       trackingMethods: 'id',
       tracks: 'id',
-      categories: 'id, trackId',        // остаётся на время Task 2 (старый код жив)
+      categories: 'id, trackId',
       places: 'id, trackId',
       types: 'id',
       units: 'id',
-      items: 'id, categoryId, placeId', // двойной индекс переходного периода
+      items: 'id, categoryId, placeId',
       ops: 'id, itemId, when',
       meta: 'key',
     }).upgrade(migrateV2);
+    this.version(3).stores({
+      household: 'id, createdAt',
+      deviceProfile: 'id',
+      trackingMethods: 'id',
+      tracks: 'id',
+      places: 'id, trackId',
+      types: 'id',
+      units: 'id',
+      items: 'id, placeId',
+      ops: 'id, itemId, when',
+      meta: 'key',
+    }).upgrade(migrateV3);
   }
 }
 
@@ -125,17 +131,8 @@ export async function softDeleteTrack(id: string): Promise<void> {
   await db.tracks.put({ ...track, deletedAt: Date.now(), ...syncMeta(await deviceId()) });
 }
 
-export async function listCategories(trackId: string): Promise<Category[]> {
-  const rows = await db.categories.where('trackId').equals(trackId).toArray();
-  return rows.filter(c => c.deletedAt === null).sort((a, b) => a.sortOrder - b.sortOrder);
-}
-
-export async function saveCategory(category: Category): Promise<void> {
-  await db.categories.put({ ...category, ...syncMeta(await deviceId()) });
-}
-
-export async function listActiveItems(categoryId: string): Promise<Item[]> {
-  const rows = await db.items.where('categoryId').equals(categoryId).toArray();
+export async function listActiveItems(placeId: string): Promise<Item[]> {
+  const rows = await db.items.where('placeId').equals(placeId).toArray();
   return rows.filter(i => i.deletedAt === null).sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
 
@@ -145,7 +142,7 @@ export async function saveItem(item: Item): Promise<void> {
 
 /** Добавление позиции: item + add-op в одной транзакции (атомарно). */
 export async function addItem(item: Item, trackId: string | null, note = ''): Promise<void> {
-  await db.transaction('rw', db.items, db.ops, db.meta, db.household, db.categories, async () => {
+  await db.transaction('rw', db.items, db.ops, db.meta, db.household, async () => {
     await db.items.put({ ...item, ...syncMeta(await deviceId()) });
     await recordOp({ type: 'add', itemId: item.id, trackId, delta: null, note });
   });
@@ -154,10 +151,10 @@ export async function addItem(item: Item, trackId: string | null, note = ''): Pr
 export async function softDeleteItem(id: string): Promise<void> {
   const item = await db.items.get(id);
   if (!item) return;
-  await db.transaction('rw', db.items, db.ops, db.meta, db.household, db.categories, async () => {
+  await db.transaction('rw', db.items, db.places, db.ops, db.meta, db.household, async () => {
     await db.items.put({ ...item, deletedAt: Date.now(), ...syncMeta(await deviceId()) });
-    const cat = await db.categories.get(item.categoryId);
-    await recordOp({ type: 'delete', itemId: id, trackId: cat?.trackId ?? null, delta: null, note: '' });
+    const place = await db.places.get(item.placeId);
+    await recordOp({ type: 'delete', itemId: id, trackId: place?.trackId ?? null, delta: null, note: '' });
   });
 }
 
@@ -169,16 +166,16 @@ export function nextDeviceSeq(): Promise<number> {
 async function mutateQuantity(
   id: string, delta: number, note: string, type: 'spend' | 'restock',
 ): Promise<void> {
-  await db.transaction('rw', db.items, db.ops, db.meta, db.household, db.categories, async () => {
+  await db.transaction('rw', db.items, db.places, db.ops, db.meta, db.household, async () => {
     const current = await db.items.get(id);
     if (!current) throw new Error(`item not found: ${id}`);
-    const cat = await db.categories.get(current.categoryId);
+    const place = await db.places.get(current.placeId);
     await db.items.put({
       ...current,
       quantity: current.quantity + delta,
       ...syncMeta(await deviceId()),
     });
-    await recordOp({ type, itemId: id, trackId: cat?.trackId ?? null, delta, note });
+    await recordOp({ type, itemId: id, trackId: place?.trackId ?? null, delta, note });
   });
 }
 
@@ -216,17 +213,19 @@ async function recordOp(input: {
   await db.ops.put(op);
 }
 
-/** Полный локальный срез для merge-движка (LocalState живёт в types.ts, Task 2). */
+/** Полный локальный срез для merge-движка (LocalState живёт в types.ts). */
 export async function loadHouseholdData(): Promise<LocalState> {
-  const [household, deviceProfile, trackingMethods, tracks, categories, items, ops] = await Promise.all([
-    getHousehold(), getDeviceProfile(),
-    db.trackingMethods.toArray(), db.tracks.toArray(),
-    db.categories.toArray(), db.items.toArray(), db.ops.toArray(),
-  ]);
+  const [household, deviceProfile, trackingMethods, tracks, types, units, places, items, ops] =
+    await Promise.all([
+      getHousehold(), getDeviceProfile(),
+      db.trackingMethods.toArray(), db.tracks.toArray(),
+      db.types.toArray(), db.units.toArray(),
+      db.places.toArray(), db.items.toArray(), db.ops.toArray(),
+    ]);
   return {
     household: household ?? null,
     deviceProfile: deviceProfile ?? null,
-    trackingMethods, tracks, categories, items, ops,
+    trackingMethods, tracks, types, units, places, items, ops,
   };
 }
 
