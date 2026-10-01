@@ -81,6 +81,7 @@ describe('db', () => {
   it('catalog: softDeleteType ставит deletedAt и убирает из списка', async () => {
     await saveType({
       id: 'typ_1', name: 'Аптечка', emoji: '🏠', trackingMethodId: 'tm_expiry', sortOrder: 0,
+      updatedAt: 1, updatedBy: 'd', deletedAt: null,
     });
     expect(await listTypes()).toHaveLength(1);
     await softDeleteType('typ_1');

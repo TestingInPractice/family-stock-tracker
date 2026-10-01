@@ -25,9 +25,12 @@ export async function migrateV2(tx: Transaction): Promise<void> {
   );
 }
 
+/** Строка items в переходный период v2: тип уже v2, но на диске может остаться ключ categoryId. */
+type ItemMaybeV2 = Item & { categoryId?: string };
+
 /** v2→v3: таблица categories дропнута схемой; из items уходит categoryId, место/тип гарантированы. */
 export async function migrateV3(tx: Transaction): Promise<void> {
-  const items = await tx.table<Item, string>('items').toArray();
+  const items = await tx.table<ItemMaybeV2, string>('items').toArray();
   await tx.table('items').bulkPut(
     items.map(({ categoryId: _drop, ...rest }) => ({
       ...rest,

@@ -17,11 +17,13 @@ describe('import', () => {
     const env = await buildHouseholdEnvelope();
     const opsBefore = await db.ops.count();
 
-    await db.transaction('rw', db.tracks, db.places, db.types, db.units, db.items, db.ops, async () => {
+    await db.transaction('rw', db.tracks, db.places, db.types, db.units, async () => {
       await Promise.all([
         db.tracks.clear(), db.places.clear(), db.types.clear(), db.units.clear(),
-        db.items.clear(), db.ops.clear(),
       ]);
+    });
+    await db.transaction('rw', db.items, db.ops, async () => {
+      await Promise.all([db.items.clear(), db.ops.clear()]);
     });
     const summary = await importHouseholdEnvelope(env);
     expect(summary.added).toBeGreaterThan(0);

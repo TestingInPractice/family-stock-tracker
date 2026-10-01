@@ -12,11 +12,13 @@ describe('e2e round-trip', () => {
   it('устройство A → файл → устройство B (пустая БД): всё на месте', async () => {
     await createTestTrack();
     const env = await buildHouseholdEnvelope();
-    await db.transaction('rw', db.tracks, db.places, db.types, db.units, db.items, db.ops, db.household, async () => {
+    await db.transaction('rw', db.tracks, db.places, db.types, db.units, async () => {
       await Promise.all([
         db.tracks.clear(), db.places.clear(), db.types.clear(), db.units.clear(),
-        db.items.clear(), db.ops.clear(),
       ]);
+    });
+    await db.transaction('rw', db.items, db.ops, db.household, async () => {
+      await Promise.all([db.items.clear(), db.ops.clear()]);
       await db.household.clear();
     });
     await importHouseholdEnvelope(parseHouseholdEnvelope(JSON.stringify(env)));

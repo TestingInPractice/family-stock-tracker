@@ -86,14 +86,6 @@ export function AddTab({ onChanged }: AddTabProps) {
   const newRow = (place: string, type: string, mode = currentMode) =>
     createEmptyRow(place, type, mode, defaultUnit);
 
-  const updateName = (i: number, value: string) => {
-    setRows(prev => {
-      const next = prev.map((r, idx) => idx === i ? { ...r, name: value } : r);
-      if (next.every(r => r.name.trim() === '') && next.length > 1) return [newRow(placeId, typeId)];
-      return next;
-    });
-  };
-
   const updateRow = (i: number, patch: Partial<AddRowModel>) => {
     setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   };
