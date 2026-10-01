@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { db, getDeviceProfile, getHousehold, getTrackingMethods, saveTrackingMethod } from '../db/db';
+import { listTypes, listUnits } from '../db/catalog';
 import { verifyPin } from '../logic/pin';
 import { genId, syncMeta } from '../logic/ids';
-import type { DeviceProfile, Household, TrackingMethod } from '../types';
+import type { DeviceProfile, Household, TrackingMethod, Type, Unit } from '../types';
 import { AdminHouseForm } from './AdminHouseForm';
 import { AdminPinForm } from './AdminPinForm';
+import { AdminTypesSection } from './AdminTypesSection';
+import { AdminUnitsSection } from './AdminUnitsSection';
 
 interface AdminScreenProps {
   onChanged: () => void;
@@ -43,6 +46,8 @@ export function AdminScreen({ onChanged, onExit }: AdminScreenProps) {
   const [verifying, setVerifying] = useState(false);
   const [profile, setProfile] = useState<DeviceProfile | null>(null);
   const [methods, setMethods] = useState<TrackingMethod[]>([]);
+  const [types, setTypes] = useState<Type[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [household, setHousehold] = useState<Household | null>(null);
   const [newMethodName, setNewMethodName] = useState('');
   const [changingPin, setChangingPin] = useState(false);
@@ -54,9 +59,13 @@ export function AdminScreen({ onChanged, onExit }: AdminScreenProps) {
     let cancelled = false;
     (async () => {
       try {
-        const [methodRows, hh] = await Promise.all([getTrackingMethods(), getHousehold()]);
+        const [methodRows, typeRows, unitRows, hh] = await Promise.all([
+          getTrackingMethods(), listTypes(), listUnits(), getHousehold(),
+        ]);
         if (cancelled) return;
         setMethods(methodRows);
+        setTypes(typeRows);
+        setUnits(unitRows);
         setHousehold(hh ?? null);
       } catch (err) {
         // База закрыта при размонтировании/завершении теста — списки не нужны.
@@ -80,6 +89,13 @@ export function AdminScreen({ onChanged, onExit }: AdminScreenProps) {
     } finally {
       setVerifying(false);
     }
+  };
+
+  const reloadCatalog = async () => {
+    const [typeRows, unitRows] = await Promise.all([listTypes(), listUnits()]);
+    setTypes(typeRows);
+    setUnits(unitRows);
+    onChanged();
   };
 
   const saveHousehold = async (patch: Partial<Pick<Household, 'name' | 'warnDays' | 'deviceLabel'>>) => {
@@ -179,6 +195,13 @@ export function AdminScreen({ onChanged, onExit }: AdminScreenProps) {
 
       <h2 style={{ fontSize: 17, margin: '0 0 8px' }}>Дом</h2>
       <AdminHouseForm household={household} onSave={patch => void saveHousehold(patch)} />
+
+      {profile?.role === 'admin' ? (
+        <>
+          <AdminTypesSection types={types} methods={methods} onChanged={() => void reloadCatalog()} />
+          <AdminUnitsSection units={units} onChanged={() => void reloadCatalog()} />
+        </>
+      ) : null}
 
       <h2 style={{ fontSize: 17, margin: '0 0 8px' }}>Безопасность</h2>
       {changingPin ? (
