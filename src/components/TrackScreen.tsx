@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db, getHousehold, spendItem } from '../db/db';
-import { listPlaces, listUnits } from '../db/catalog';
-import { STATUS_META } from '../constants';
+import { listPlaces, listUnits, savePlace } from '../db/catalog';
+import { STATUS_META, UI_TEXTS } from '../constants';
+import { genId } from '../logic/ids';
 import { computeStatus, sortByUrgency } from '../logic/status';
 import { SpendModal } from './SpendModal';
 import type { Household, Item, Place, Track, Unit } from '../types';
@@ -60,6 +61,17 @@ export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
     await load();
   };
 
+  const handleAddPlace = async () => {
+    const name = window.prompt(UI_TEXTS.placeNamePrompt);
+    if (!name || name.trim() === '') return;
+    const emoji = window.prompt(UI_TEXTS.placeEmojiPrompt) || '📦';
+    await savePlace({
+      id: genId('plc'), trackId, name: name.trim(), emoji,
+      sortOrder: places.length, updatedAt: Date.now(), updatedBy: 'ui', deletedAt: null,
+    });
+    await load();
+  };
+
   return (
     <section>
       <header style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -67,6 +79,16 @@ export function TrackScreen({ trackId, onBack, onChanged }: TrackScreenProps) {
         <span style={{ fontSize: 28 }}>{track?.emoji ?? '📦'}</span>
         <h1 style={{ margin: 0, fontSize: 22 }}>{track?.name ?? 'Трек'}</h1>
       </header>
+      <button
+        type="button"
+        style={{
+          marginBottom: 12, padding: '8px 14px', borderRadius: 10,
+          border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 700,
+        }}
+        onClick={() => void handleAddPlace()}
+      >
+        {UI_TEXTS.addPlace}
+      </button>
       {trackPlaces.length === 0 ? (
         <p>В этом треке пока нет мест.</p>
       ) : (
