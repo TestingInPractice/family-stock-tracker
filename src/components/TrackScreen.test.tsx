@@ -22,7 +22,8 @@ describe('TrackScreen', () => {
     await waitFor(async () => {
       expect(await db.places.where('trackId').equals(track.id).count()).toBe(2);
     });
-    // заголовок места рендерится как «<emoji> <name>», поэтому regex, как в AdminScreen.test.tsx
-    expect(screen.getByText(/Аптечка в машине/)).toBeInTheDocument();
+    // findBy*, а не getBy*: waitFor выше ждёт только коммит в БД, а список мест
+    // перерисовывается позже — синхронный getByText попадал в зазор и тест флакал.
+    expect(await screen.findByText(/Аптечка в машине/)).toBeInTheDocument();
   });
 });
