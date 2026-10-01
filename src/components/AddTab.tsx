@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
 import { addItem, db, listTracks } from '../db/db';
 import { listPlaces, listTypes, listUnits } from '../db/catalog';
-import { genId } from '../logic/ids';
+import { UI_TEXTS } from '../constants';
+import { AddRow } from './AddRow';
 import {
-  actionStyle, chipStyle, emptyRow, fieldStyle, modeFromMethod,
-  pluralizePositions, quantityOrOne, rowStyle, toIsoDate,
-  type Mode, type Row,
+  actionStyle, createEmptyRow, DEFAULT_UNIT, DEFAULT_MODE, fieldStyle, modeFromMethod,
+  parseRows, pluralizePositions, toIsoDate,
+  type AddRow as AddRowModel,
 } from '../logic/add-form';
 import type { Place, TrackingMethod, Track, Type, Unit } from '../types';
 
@@ -24,12 +24,14 @@ export function AddTab({ onChanged }: AddTabProps) {
   const [placeId, setPlaceId] = useState('');
   const [typeId, setTypeId] = useState('');
   const [allNames, setAllNames] = useState<string[]>([]);
-  const [rows, setRows] = useState<Row[]>(() => [emptyRow()]);
+  const [rows, setRows] = useState<AddRowModel[]>(() => [createEmptyRow('', '', DEFAULT_MODE, DEFAULT_UNIT)]);
   const [loaded, setLoaded] = useState(false);
   const nameRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [pendingFocus, setPendingFocus] = useState<number | null>(null);
 
-  const currentMode = modeFromMethod(methods.get(types.find(t => t.id === typeId)?.trackingMethodId ?? ''));
+  const defaultUnit = units[0]?.name ?? DEFAULT_UNIT;
+  const modeOf = (id: string) => modeFromMethod(methods.get(types.find(t => t.id === id)?.trackingMethodId ?? ''));
+  const currentMode = modeOf(typeId);
   const nonEmptyCount = rows.filter(r => r.name.trim() !== '').length;
 
   useEffect(() => {
@@ -42,10 +44,10 @@ export function AddTab({ onChanged }: AddTabProps) {
       const methodMap = new Map(methodRows.map(m => [m.id, m]));
       setMethods(methodMap);
       setAllNames([...new Set(items.filter(i => i.deletedAt === null).map(i => i.name))]);
-      if (trackRows.length === 0) { setTracks([]); setLoaded(true); return; }
-      setTracks(trackRows);
       setTypes(typeRows);
       setUnits(unitRows);
+      if (trackRows.length === 0) { setTracks([]); setLoaded(true); return; }
+      setTracks(trackRows);
       const firstTrackId = trackRows[0].id;
       const plcs = await listPlaces(firstTrackId);
       if (cancelled) return;
@@ -65,9 +67,10 @@ export function AddTab({ onChanged }: AddTabProps) {
       setPlaceId(defaultPlaceId);
       setTypeId(defaultTypeId);
       const mode = modeFromMethod(methodMap.get(typeRows.find(t => t.id === defaultTypeId)?.trackingMethodId ?? ''));
+      const unit = unitRows[0]?.name ?? DEFAULT_UNIT;
       setRows(prev => prev.map(r => ({
-        ...r, placeId: defaultPlaceId, typeId: defaultTypeId,
-        trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
+        ...r, placeId: defaultPlaceId, typeId: defaultTypeId, unit: r.unit || unit,
+        trackExpiry: mode.expiry, trackQuantity: mode.quantity,
       })));
       setLoaded(true);
     })();
@@ -80,31 +83,32 @@ export function AddTab({ onChanged }: AddTabProps) {
     setPendingFocus(null);
   }, [pendingFocus, rows.length]);
 
+  const newRow = (place: string, type: string, mode = currentMode) =>
+    createEmptyRow(place, type, mode, defaultUnit);
+
   const updateName = (i: number, value: string) => {
     setRows(prev => {
       const next = prev.map((r, idx) => idx === i ? { ...r, name: value } : r);
-      if (next.every(r => r.name.trim() === '') && next.length > 1) {
-        return [emptyRow(placeId, typeId, currentMode)];
-      }
+      if (next.every(r => r.name.trim() === '') && next.length > 1) return [newRow(placeId, typeId)];
       return next;
     });
   };
 
-  const updateRow = (i: number, patch: Partial<Row>) => {
+  const updateRow = (i: number, patch: Partial<AddRowModel>) => {
     setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   };
 
-  const addRow = () => {
-    setRows(prev => [...prev, emptyRow(placeId, typeId, currentMode)]);
+  const addRow = () => setRows(prev => [...prev, newRow(placeId, typeId)]);
+
+  const removeRow = (i: number) => {
+    setRows(prev => (prev.length === 1 ? [newRow(placeId, typeId)] : prev.filter((_, idx) => idx !== i)));
   };
 
   const handleNameFocus = (i: number) => {
     if (i === rows.length - 1 && rows[i].name.trim() !== '') addRow();
   };
 
-  const handleNameKeyDown = (e: KeyboardEvent<HTMLInputElement>, i: number) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
+  const handleFocusNext = (i: number) => {
     if (i === rows.length - 1) {
       addRow();
       setPendingFocus(i + 1);
@@ -117,9 +121,12 @@ export function AddTab({ onChanged }: AddTabProps) {
     setTrackId(id);
     const plcs = await listPlaces(id);
     setPlaces(plcs);
-    const defaultPlaceId = plcs[0]?.id ?? '';
-    setPlaceId(defaultPlaceId);
-    setRows(prev => prev.map(r => ({ ...r, placeId: defaultPlaceId })));
+    const nextPlaceId = plcs[0]?.id ?? '';
+    const nextTypeId = types[0]?.id ?? '';
+    const mode = modeOf(nextTypeId);
+    setPlaceId(nextPlaceId);
+    setTypeId(nextTypeId);
+    setRows([newRow(nextPlaceId, nextTypeId, mode)]);
   };
 
   const handlePlaceChange = (id: string) => {
@@ -129,55 +136,35 @@ export function AddTab({ onChanged }: AddTabProps) {
 
   const handleTypeChange = (id: string) => {
     setTypeId(id);
-    const mode = modeFromMethod(methods.get(types.find(t => t.id === id)?.trackingMethodId ?? ''));
+    const mode = modeOf(id);
     setRows(prev => prev.map(r => ({
-      ...r, typeId: id, trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
+      ...r, typeId: id, trackExpiry: mode.expiry, trackQuantity: mode.quantity,
     })));
   };
 
   const submit = async () => {
-    const nonEmpty = rows.filter(r => r.name.trim() !== '');
-    if (nonEmpty.length === 0) return;
+    const items = parseRows(rows);
+    if (items.length === 0) return;
     // onChanged до await: fake-indexeddb использует setImmediate-макрозадачи,
     // не завершающиеся за userEvent.click (см. SpendModal). addItem — одна
     // транзакция, ставится в очередь синхронно, поэтому к db.close() в
     // afterEach незавершённых записей не остаётся.
     const pending = (async () => {
-      for (const row of nonEmpty) {
-        await addItem({
-          id: genId('itm'),
-          placeId: row.placeId,
-          typeId: row.typeId,
-          name: row.name.trim(),
-          unit: row.unit || 'шт',
-          quantity: quantityOrOne(row.quantity),
-          expiresAt: row.expiresAt,
-          minThreshold: null,
-          maxThreshold: null,
-          packSize: null,
-          trackExpiry: row.trackExpiry,
-          trackQuantity: row.trackQuantity,
-          notes: '',
-          createdAt: Date.now(),
-          updatedAt: 0,
-          updatedBy: '',
-          deletedAt: null,
-        }, trackId);
-      }
+      for (const item of items) await addItem(item, trackId, '');
     })();
     const metaPut = db.meta.put({ key: 'lastPlaceId', value: placeId });
     const metaPutType = db.meta.put({ key: 'lastTypeId', value: typeId });
     onChanged();
     await pending;
     await Promise.all([metaPut, metaPutType]);
-    setRows([emptyRow(placeId, typeId, currentMode)]);
+    setRows([newRow(placeId, typeId)]);
   };
 
   if (loaded && (tracks.length === 0 || places.length === 0 || types.length === 0)) {
     return (
       <section>
         <h1>Добавление</h1>
-        <p>Сначала создайте трек и место в нём, а тип позиции — в админке</p>
+        <p>{UI_TEXTS.emptyAddForm}</p>
       </section>
     );
   }
@@ -205,45 +192,20 @@ export function AddTab({ onChanged }: AddTabProps) {
           </select>
         </label>
       </div>
-      <datalist id="addtab-item-names">
-        {allNames.map(n => <option key={n} value={n} />)}
-      </datalist>
       {rows.map((row, i) => (
-        <div key={i} style={rowStyle}>
-          <input
-            ref={el => { nameRefs.current[i] = el; }}
-            type="text"
-            aria-label="Название позиции"
-            list="addtab-item-names"
-            value={row.name}
-            placeholder="Название"
-            style={fieldStyle}
-            onFocus={() => handleNameFocus(i)}
-            onChange={e => updateName(i, e.target.value)}
-            onKeyDown={e => handleNameKeyDown(e, i)}
-          />
-          <input
-            type="number"
-            min={1}
-            aria-label="Количество"
-            value={row.quantity}
-            style={{ ...fieldStyle, width: 70 }}
-            onChange={e => updateRow(i, { quantity: e.target.value })}
-          />
-          <select aria-label="Единица" value={row.unit} style={fieldStyle} onChange={e => updateRow(i, { unit: e.target.value })}>
-            {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
-          </select>
-          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: toIsoDate(1) })}>+1 мес</button>
-          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: toIsoDate(12) })}>+1 год</button>
-          <input
-            type="date"
-            aria-label="Своя дата"
-            value={row.expiresAt ?? ''}
-            style={fieldStyle}
-            onChange={e => updateRow(i, { expiresAt: e.target.value || null })}
-          />
-          <button type="button" style={chipStyle} onClick={() => updateRow(i, { expiresAt: null })}>не задан</button>
-        </div>
+        <AddRow
+          key={i}
+          row={row}
+          index={i}
+          nameRef={el => { nameRefs.current[i] = el; }}
+          units={units}
+          allNames={allNames}
+          onChange={updateRow}
+          onRemove={removeRow}
+          onFocusNext={handleFocusNext}
+          onNameFocus={handleNameFocus}
+          onSetExpiryOffset={(idx, months) => updateRow(idx, { expiresAt: toIsoDate(months) })}
+        />
       ))}
       <button type="button" style={actionStyle} disabled={nonEmptyCount === 0} onClick={() => void submit()}>
         Добавить {nonEmptyCount} {pluralizePositions(nonEmptyCount)}

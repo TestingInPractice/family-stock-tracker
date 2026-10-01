@@ -1,23 +1,31 @@
 import type { CSSProperties } from 'react';
-import type { TrackingMethod } from '../types';
+import type { Item, TrackingMethod } from '../types';
+import { genId } from './ids';
 
+/** Режим отслеживания позиции, наследуемый от способа отслеживания её типа. */
 export interface Mode {
-  trackExpiry: boolean;
-  trackQuantity: boolean;
+  expiry: boolean;
+  quantity: boolean;
 }
 
-export interface Row {
+/** Строка формы добавления (v2: место + тип приходят из каскада селектов). */
+export interface AddRow {
   name: string;
   quantity: string;
   unit: string;
-  expiresAt: string | null;
   placeId: string;
   typeId: string;
+  min: string;   // «купить, когда ≤ N»
+  max: string;   // «избыток, когда ≥ N»
+  expiresAt: string | null;
+  packSize: string | null;
   trackExpiry: boolean;
   trackQuantity: boolean;
+  notes: string;
 }
 
-export const DEFAULT_MODE: Mode = { trackExpiry: true, trackQuantity: true };
+export const DEFAULT_MODE: Mode = { expiry: true, quantity: true };
+export const DEFAULT_UNIT = 'шт';
 
 export const fieldStyle: CSSProperties = {
   padding: '8px 10px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 15,
@@ -36,14 +44,53 @@ export const actionStyle: CSSProperties = {
 
 export function modeFromMethod(method: TrackingMethod | undefined): Mode {
   if (!method) return DEFAULT_MODE;
-  return { trackExpiry: method.flags.expiry, trackQuantity: method.flags.quantity };
+  return { expiry: method.flags.expiry, quantity: method.flags.quantity };
 }
 
-export function emptyRow(placeId = '', typeId = '', mode: Mode = DEFAULT_MODE): Row {
+export function createEmptyRow(
+  placeId: string, typeId: string, mode: Mode, defaultUnit: string,
+): AddRow {
   return {
-    name: '', quantity: '1', unit: 'шт', expiresAt: null, placeId, typeId,
-    trackExpiry: mode.trackExpiry, trackQuantity: mode.trackQuantity,
+    name: '', quantity: '', unit: defaultUnit, placeId, typeId,
+    min: '', max: '', expiresAt: null, packSize: null,
+    trackExpiry: mode.expiry, trackQuantity: mode.quantity, notes: '',
   };
+}
+
+/** Пустая/битая строка → null; запятая как десятичный разделитель. */
+export function toNumberOrNull(raw: string): number | null {
+  const v = raw.trim().replace(',', '.');
+  if (v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Строки формы → позиции для addItem. Бросает, если у строки не выбран тип. */
+export function parseRows(rows: AddRow[]): Item[] {
+  return rows
+    .filter(r => r.name.trim() !== '')
+    .map(r => {
+      if (r.typeId === '') throw new Error('Выберите тип позиции');
+      return {
+        id: genId('itm'),
+        placeId: r.placeId,
+        typeId: r.typeId,
+        name: r.name.trim(),
+        unit: r.unit || DEFAULT_UNIT,
+        quantity: quantityOrOne(r.quantity),
+        minThreshold: toNumberOrNull(r.min),
+        maxThreshold: toNumberOrNull(r.max),
+        expiresAt: r.expiresAt,
+        packSize: r.packSize === null ? null : toNumberOrNull(r.packSize),
+        trackExpiry: r.trackExpiry,
+        trackQuantity: r.trackQuantity,
+        notes: r.notes,
+        createdAt: Date.now(),
+        updatedAt: 0,
+        updatedBy: '',
+        deletedAt: null,
+      };
+    });
 }
 
 export function pluralizePositions(n: number): string {
